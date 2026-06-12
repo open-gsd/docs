@@ -1,0 +1,130 @@
+---
+title: "Cross-AI Plan Review: Get Peer Feedback Before Writing Code"
+sidebarTitle: "Cross-AI Review"
+description: "Send phase plans to multiple AI reviewers with /gsd-review, feed the results into replanning, and automate convergence with /gsd-plan-review-convergence."
+---
+
+Cross-AI review lets you send your phase plans to multiple AI providers simultaneously and collect structured feedback before any code is written. Each reviewer produces an independent assessment of the plan's feasibility, risks, and gaps, and GSD synthesizes the results into a single `REVIEWS.md` artifact that the planner can consume directly to drive a more informed replan.
+
+## Running /gsd-review
+
+Run `/gsd-review --phase N` to dispatch your phase plans to one or more AI reviewers. GSD reads the phase's PLAN.md files, assembles a review prompt that includes the roadmap, requirements, and context, and sends it to each selected reviewer in parallel.
+
+```bash
+/gsd-review --phase 2               # Run default configured reviewers
+/gsd-review --phase 2 --gemini      # Gemini CLI only
+/gsd-review --phase 2 --codex       # Codex CLI only
+/gsd-review --phase 2 --claude      # Separate Claude session
+/gsd-review --phase 2 --opencode    # OpenCode review
+/gsd-review --phase 2 --qwen        # Qwen Code review
+/gsd-review --phase 2 --cursor      # Cursor agent review
+/gsd-review --phase 2 --agy         # Antigravity CLI review
+/gsd-review --phase 2 --all         # Every available reviewer in parallel
+```
+
+<Accordion title="Reviewer flag reference">
+  | Flag | Reviewer | Requires |
+  |------|----------|----------|
+  | `--gemini` | Gemini CLI | `gemini` CLI installed and authenticated |
+  | `--claude` | Claude (separate session) | `claude` CLI installed |
+  | `--codex` | Codex CLI | `codex` CLI installed |
+  | `--opencode` | OpenCode | `opencode` CLI installed |
+  | `--qwen` | Qwen Code | Qwen CLI installed and API key set |
+  | `--cursor` | Cursor agent | Cursor configured with agent access |
+  | `--agy` / `--antigravity` | Antigravity CLI | Free with Google credentials |
+  | `--all` | All detected reviewers | Each respective CLI must be installed and authenticated |
+</Accordion>
+
+**Produces:** `{phase}-REVIEWS.md` — a structured document containing each reviewer's feedback, severity classifications, and specific concerns about the plan
+
+## Default reviewer configuration
+
+Rather than specifying reviewer flags on every run, set `review.default_reviewers` in `config.json` to scope the no-flag `/gsd-review` call to a subset of reviewers you always want:
+
+```json
+{
+  "review": {
+    "default_reviewers": ["gemini", "codex"]
+  }
+}
+```
+
+With this config set, running `/gsd-review --phase 2` with no flags will use Gemini and Codex. Explicit reviewer flags override this setting for that run. `--all` always runs the full detected set regardless of config.
+
+## How REVIEWS.md feeds back into planning
+
+After `/gsd-review` completes, pass `--reviews` to `/gsd-plan-phase` to replan using the cross-AI feedback as additional context. The planner reads `REVIEWS.md`, incorporates HIGH and MEDIUM concerns into revised task sequencing and risk mitigation, and produces an updated set of PLAN.md files.
+
+```bash
+/gsd-review --phase 2 --all          # Step 1: collect reviews
+/gsd-plan-phase 2 --reviews          # Step 2: replan with review feedback
+```
+
+<Note>
+  `--reviews` skips the research step by default — it assumes your RESEARCH.md is still valid and focuses the planner's attention on addressing the specific concerns raised in REVIEWS.md. Combine `--reviews --research` to force a full research refresh before replanning.
+</Note>
+
+## Automated convergence loop
+
+Run `/gsd-plan-review-convergence N` to automate the plan → review → replan cycle until no HIGH concerns remain. The command spawns a planning agent and one or more review agents, counts unresolved HIGH concerns in each cycle's `CYCLE_SUMMARY`, and replans automatically until the plan converges or the cycle cap is reached.
+
+```bash
+/gsd-plan-review-convergence 3                    # Default reviewers, 3 cycles max
+/gsd-plan-review-convergence 3 --codex            # Codex-only convergence loop
+/gsd-plan-review-convergence 3 --all              # All reviewers
+/gsd-plan-review-convergence 3 --all --max-cycles 5   # Extend cap to 5 cycles
+```
+
+<Steps>
+  <Step title="Plan">
+    Spawns a planning agent to produce PLAN.md for the phase.
+  </Step>
+  <Step title="Review">
+    Dispatches the plan to selected AI reviewers in parallel.
+  </Step>
+  <Step title="Count HIGH concerns">
+    Parses the `CYCLE_SUMMARY` from REVIEWS.md to count unresolved HIGH-severity concerns.
+  </Step>
+  <Step title="Converge or replan">
+    If HIGH count is zero, the loop exits successfully. If HIGH count is non-zero and cycles remain, replans with `--reviews` feedback and repeats from Step 2.
+  </Step>
+  <Step title="Escalate on stall">
+    If the HIGH count stops decreasing across cycles, the command warns about a stall and offers the choice to proceed manually or extend the cycle cap.
+  </Step>
+</Steps>
+
+<Warning>
+  `/gsd-plan-review-convergence` is disabled by default. Enable it by setting `workflow.plan_review_convergence: true` in `config.json` before running the command.
+</Warning>
+
+## Configuring per-reviewer model selection
+
+You can specify which model each reviewer CLI should use by setting `review.models.<cli>` in `config.json`. When a key is absent, GSD uses each CLI's configured default.
+
+```json
+{
+  "review": {
+    "models": {
+      "gemini": "gemini-2.5-pro",
+      "opencode": "anthropic/claude-sonnet-4-6",
+      "qwen": "qwen-max"
+    }
+  }
+}
+```
+
+Set these values interactively via `/gsd-config --integrations`.
+
+## Prerequisites
+
+Before using cross-AI review, verify that each reviewer you plan to use is installed, authenticated, and reachable from your terminal.
+
+<Accordion title="Checking each reviewer">
+  **Cloud CLIs (Gemini, Codex, OpenCode, Qwen, Cursor):** Run the CLI with `--version` or a simple query to confirm it is installed and authenticated with a valid API key.
+
+  **Antigravity (agy):** Free with Google credentials. Install the CLI and authenticate with your Google account before running.
+</Accordion>
+
+<Note>
+  Local model servers (Ollama, LM Studio, llama.cpp) are supported as reviewers in `/gsd-plan-review-convergence` but not in `/gsd-review`. Use `/gsd-plan-review-convergence` with the `--ollama`, `--lm-studio`, or `--llama-cpp` flags to run the full convergence loop against a local model.
+</Note>

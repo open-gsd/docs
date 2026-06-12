@@ -1,0 +1,138 @@
+---
+title: "GSD Core's Five-Step Phase Loop and Workflow Guide"
+sidebarTitle: "Workflow"
+description: "Understand GSD Core's phase loop: the five-step Discuss, Plan, Execute, Verify, and Ship cycle that drives every milestone from vision to shipped code."
+---
+
+GSD Core organizes all development work into a disciplined, repeatable cycle called the phase loop. Every milestone is broken into numbered phases, and every phase moves through the same five steps in sequence. This structure is what separates GSD Core from ad-hoc AI coding: each step produces artifacts that the next step consumes, so nothing relies on conversation memory and every decision is traceable to a document on disk.
+
+## The five-step phase loop
+
+Each phase in your `ROADMAP.md` moves through these steps in order:
+
+<Steps>
+  <Step title="Discuss">
+    Before any planning begins, you lock in your implementation preferences by running `/gsd-discuss-phase N`. GSD Core reads the phase description from your roadmap, scans the existing codebase for relevant patterns, and asks targeted questions about gray areas — library choices, design patterns, testing approach, and any decisions where multiple options are viable.
+
+    Your answers are written to `.planning/phases/XX-name/XX-CONTEXT.md`. Every downstream agent — the planner, the executor, and the verifier — reads this file. Nothing is inferred; everything is explicit.
+
+    **Outcome:** `CONTEXT.md` containing a `<decisions>` block of numbered implementation decisions.
+  </Step>
+
+  <Step title="Plan">
+    The `/gsd-plan-phase N` command runs the full research-and-planning pipeline. Four specialist researchers run in parallel, each exploring a different dimension of the implementation domain. A synthesizer combines their findings into `RESEARCH.md`. The planner then reads `PROJECT.md`, `REQUIREMENTS.md`, `CONTEXT.md`, and `RESEARCH.md` together to create two to three atomic execution plans.
+
+    A plan-checker agent verifies the plans across eight dimensions before they are approved. If plans fail the check, the planner revises them automatically (up to three iterations). The plans are not approved until the checker returns a PASS verdict.
+
+    **Outcome:** `RESEARCH.md` and one or more `XX-YY-PLAN.md` files containing structured task lists with explicit dependency ordering.
+  </Step>
+
+  <Step title="Execute">
+    The `/gsd-execute-phase N` command analyzes plan dependencies, groups plans into waves, and spawns parallel executor subagents. Each executor runs in a fresh context window — up to 200K tokens, or up to 1M tokens on models that support it — with no accumulated conversation history.
+
+    Each executor reads only its assigned `PLAN.md` plus the phase context files, implements the tasks, makes an atomic git commit per completed task, and writes a `SUMMARY.md` documenting outcomes and deviations. After all waves complete, a verifier agent runs a goal-backward check against the phase requirements.
+
+    **Outcome:** Committed code, per-plan `SUMMARY.md` files, and a `VERIFICATION.md` with a PASS or FAIL verdict.
+  </Step>
+
+  <Step title="Verify">
+    The `/gsd-verify-work N` command walks you through a structured user acceptance testing session. You test the implemented features against the phase goals, document your findings, and mark the phase as verified or flag issues. GSD Core reads the automated verification results alongside your UAT notes to build a complete picture of phase quality.
+
+    If issues are found, GSD Core generates targeted fix plans. The phase is not considered done until both automated verification and UAT pass.
+
+    **Outcome:** `UAT.md` documenting your acceptance test results and any outstanding issues.
+  </Step>
+
+  <Step title="Ship">
+    The `/gsd-ship N` command reads all phase artifacts — plans, summaries, verification results, and UAT notes — and generates a structured pull request. It archives the phase state, advances `STATE.md` to the next phase, and writes a `continue-here.md` handoff for the next session.
+
+    **Outcome:** A pull request, archived phase artifacts, and an updated `STATE.md` ready for the next phase.
+  </Step>
+</Steps>
+
+## How phases map to milestones
+
+A **milestone** is a major product goal — a shippable increment that delivers meaningful value. A **phase** is one step toward that milestone. Your `ROADMAP.md` organizes phases under milestones and tracks the status of each.
+
+```text
+Milestone 1: Core Authentication
+  Phase 1: Database schema and user model
+  Phase 2: Registration and login endpoints
+  Phase 3: Session management and JWT
+  Phase 4: Password reset flow
+
+Milestone 2: Dashboard
+  Phase 5: Layout and navigation shell
+  Phase 6: Data fetching and charts
+  ...
+```
+
+Each phase is small enough to plan, execute, and verify in one session. Phases that are too large produce plans with too many tasks, which executors cannot reliably complete in a single context window. The guideline is two to three atomic plans per phase, each with two to three tasks.
+
+When a milestone is complete, run `/gsd-audit-milestone` to check requirement coverage and detect any stubs, then `/gsd-complete-milestone` to archive and tag the work.
+
+## Spec-driven development
+
+GSD Core applies a spec-driven development approach: every requirement is written down before any code is written, and every artifact gates the next stage. The flow looks like this:
+
+```text
+User vision
+    │
+    ▼
+REQUIREMENTS.md — scoped requirements with IDs (REQ-001, REQ-002, ...)
+    │
+    ▼
+ROADMAP.md — phases mapped to requirement IDs (traceability guaranteed)
+    │
+    ▼
+CONTEXT.md — implementation preferences per phase
+    │
+    ▼
+RESEARCH.md — ecosystem research per phase
+    │
+    ▼
+PLAN.md — atomic execution tasks referencing requirements and acceptance criteria
+    │
+    ▼
+SUMMARY.md — what was built, deviations from plan
+    │
+    ▼
+VERIFICATION.md — goal-backward check against phase requirements
+    │
+    ▼
+UAT.md — human acceptance testing results
+```
+
+The plan-checker enforces that every plan covers the requirements it claims to cover. The verifier enforces that every requirement mapped to the phase is actually implemented. If a requirement is not covered, the phase does not advance.
+
+## Artifact dependency map
+
+Each artifact is consumed by specific agents downstream. The table below shows which agents read each planning artifact:
+
+| Artifact | Read by |
+|----------|---------|
+| `PROJECT.md` | All agents — planner, executor, verifier, researcher |
+| `REQUIREMENTS.md` | Planner, plan-checker, verifier, auditor |
+| `ROADMAP.md` | Orchestrators, roadmapper |
+| `STATE.md` | All agents — decisions, blockers, current position |
+| `CONTEXT.md` (per phase) | Researcher, planner, executor |
+| `RESEARCH.md` (per phase) | Planner, plan-checker |
+| `PLAN.md` (per plan) | Executor, plan-checker |
+| `SUMMARY.md` (per plan) | Verifier, state tracking |
+
+Nothing is held in conversation memory. If you run `/clear` between steps, everything the next agent needs is already on disk.
+
+## Namespace routing
+
+GSD Core ships six **namespace meta-skills** as top-level entry points for the phase pipeline. Each namespace router maps natural-language intent to the correct concrete command:
+
+| Namespace | Command | Routes to |
+|-----------|---------|-----------|
+| Phase pipeline | `/gsd-workflow` | discuss, plan, execute, verify, progress |
+| Project lifecycle | `/gsd-project` | milestones, audits, summary |
+| Quality gates | `/gsd-quality` | code review, debug, security, UI audit |
+| Codebase intelligence | `/gsd-context` | map, graphify, docs, learnings |
+| Management | `/gsd-manage` | config, workspace, workstreams, ship |
+| Exploration | `/gsd-ideate` | explore, sketch, spike, spec, capture |
+
+You can always invoke concrete commands directly (for example, `/gsd-plan-phase 1`). The namespace routers exist to reduce the token cost of skill discovery — six entries instead of eighty-six.

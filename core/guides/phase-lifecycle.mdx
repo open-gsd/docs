@@ -1,0 +1,165 @@
+---
+title: "GSD Core Phase Lifecycle: From First Discussion to Ship"
+sidebarTitle: "Phase Lifecycle"
+description: "Walk through every step of a GSD Core phase, from discuss through plan, execute, verify, and ship, with all commands and artifacts explained."
+---
+
+Every phase in GSD Core follows the same five-step loop: discuss, plan, execute, verify, ship. Each step runs in a fresh subagent context window, which means the AI starts each step with exactly the context it needs rather than a polluted history of everything that happened before. This architecture is why GSD maintains consistent output quality even on large projects with many phases.
+
+## Step 1 — Discuss the phase
+
+Before any planning begins, run `/gsd-discuss-phase N` to surface implementation decisions that would otherwise become hidden assumptions inside a plan. The command asks targeted questions about the phase, records your answers, and writes a structured context document for the planner to consume.
+
+```bash
+/gsd-discuss-phase 1              # Interactive discussion for phase 1
+/gsd-discuss-phase 1 --all        # Discuss all gray areas without a selection step
+/gsd-discuss-phase 3 --auto       # Auto-select recommended defaults for phase 3
+/gsd-discuss-phase 1 --batch      # Group questions for batch intake
+/gsd-discuss-phase 2 --analyze    # Add trade-off analysis during discussion
+/gsd-discuss-phase 1 --power      # Bulk answers from a prepared answers file
+/gsd-discuss-phase 3 --assumptions # Surface Claude's assumptions before planning
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--all` | Skip area selection and discuss every gray area interactively |
+  | `--auto` | Auto-select recommended defaults for all questions; no user input required |
+  | `--batch` | Group related questions together for faster batch intake |
+  | `--analyze` | Adds trade-off analysis to each decision before recording the answer |
+  | `--power` | Reads a pre-prepared answers file and applies answers in bulk |
+  | `--assumptions` | Generates a list of Claude's current assumptions about the phase without an interactive session |
+</Accordion>
+
+**Produces:** `{phase}-CONTEXT.md` (structured implementation decisions), `{phase}-DISCUSSION-LOG.md` (full audit trail of the session)
+
+## Step 2 — Plan the phase
+
+Run `/gsd-plan-phase N` to research the problem domain, decompose work into executable plans, and verify that each plan fits within a fresh 200k-token context window. The planner reads your ROADMAP, REQUIREMENTS, and CONTEXT documents and produces one PLAN.md per parallel execution wave.
+
+```bash
+/gsd-plan-phase 1                       # Research + plan + verify for phase 1
+/gsd-plan-phase 1 --skip-research       # Skip domain research (familiar territory)
+/gsd-plan-phase 1 --tdd                 # Enable red-green-refactor task sequencing
+/gsd-plan-phase 1 --mvp                 # Organize tasks as vertical feature slices
+/gsd-plan-phase 2 --granularity fine    # Override granularity for this run only
+/gsd-plan-phase 1 --bounce              # Run external validation after planning
+/gsd-plan-phase 2 --reviews             # Replan with cross-AI review feedback
+/gsd-plan-phase 2 --gaps                # Gap-closure mode (reads VERIFICATION.md)
+/gsd-plan-phase 2 --prd design.md       # Use a PRD file instead of discuss output
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--skip-research` | Skip domain research (useful when the domain is well understood) |
+  | `--research` | Force re-research even when RESEARCH.md already exists |
+  | `--gaps` | Gap-closure mode — reads VERIFICATION.md to address open issues, skips research |
+  | `--prd <file>` | Use a PRD file as phase context instead of the discuss-phase output |
+  | `--mvp` | Planner organizes tasks as vertical feature slices (UI→API→DB) |
+  | `--tdd` | Apply red-green-refactor sequencing to eligible behavior-adding tasks |
+  | `--granularity <coarse\|standard\|fine>` | Override planning granularity for this invocation only |
+  | `--bounce` | Run external plan validation script after planning |
+  | `--reviews` | Feed REVIEWS.md cross-AI feedback back into replanning |
+</Accordion>
+
+**Produces:** `{phase}-RESEARCH.md`, one or more `{phase}-{N}-PLAN.md` files, `{phase}-VALIDATION.md`
+
+<Note>
+  Set `workflow.research: false` in `config.json` to permanently skip research for all phases. You can also skip it per-run with `--skip-research` without changing config.
+</Note>
+
+## Step 3 — Execute the phase
+
+Run `/gsd-execute-phase N` to execute all plans in the phase. GSD groups plans into dependency-ordered waves and runs each wave in parallel using git worktrees, so independent plans execute simultaneously without conflicting. Each executor agent starts with a clean context window and the full plan as its sole input.
+
+```bash
+/gsd-execute-phase 1              # Execute all waves in phase 1
+/gsd-execute-phase 1 --wave 2     # Execute only Wave 2 (resume after interruption)
+/gsd-execute-phase 1 --gaps-only  # Execute only gap-closure plans after verify-work
+/gsd-execute-phase 1 --interactive # Execute plans sequentially with user checkpoints
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--wave N` | Execute only the specified wave; useful for resuming after an interruption |
+  | `--gaps-only` | Execute only gap-closure plans (those created by verify-work to fix failing requirements) |
+  | `--interactive` | Execute plans sequentially inline with user checkpoints between tasks; lower token usage, pair-programming style |
+</Accordion>
+
+**Produces:** Per-plan `{phase}-{N}-SUMMARY.md` files, git commits for all code changes, and `{phase}-VERIFICATION.md` when the phase finishes
+
+<Info>
+  Wave-based parallelization uses git worktrees by default. If your environment does not support worktrees, set `workflow.use_worktrees: false` in `config.json` to fall back to sequential execution.
+</Info>
+
+## Step 4 — Verify the work
+
+Run `/gsd-verify-work N` to perform user acceptance testing against the phase goals. The verifier walks through what was built, checks each requirement from CONTEXT.md and REQUIREMENTS.md, and generates fix plans for anything that did not meet the acceptance criteria.
+
+```bash
+/gsd-verify-work 1                # UAT for phase 1
+```
+
+**Produces:** `{phase}-UAT.md` with acceptance status per requirement; fix plans for any failures that require remediation before shipping
+
+<Warning>
+  Do not skip verification before running `/gsd-ship`. The ship command expects a passing verification record. If you need to ship with known gaps, address them with `/gsd-plan-phase --gaps` and re-execute before shipping.
+</Warning>
+
+## Step 5 — Ship the phase
+
+Run `/gsd-ship N` to create a GitHub pull request from the completed phase work. GSD generates a rich PR body from your planning artifacts — requirements addressed, key decisions, verification evidence — so reviewers have full context without reading the planning files directly.
+
+```bash
+/gsd-ship 1                       # Create PR for phase 1
+/gsd-ship 1 --draft               # Create as a draft PR
+```
+
+**Prerequisites:** `gh` CLI installed and authenticated, phase verified by `/gsd-verify-work`
+
+**Produces:** GitHub PR with auto-generated body, STATE.md updated to mark the phase as shipped
+
+## Tracking progress
+
+Use `/gsd-progress` at any point to see where you are in the lifecycle and what the recommended next step is.
+
+```bash
+/gsd-progress                        # Show project status and next recommended step
+/gsd-progress --next                 # Auto-advance to the next workflow step
+/gsd-progress --do "fix the auth bug" # Dispatch freeform intent to the best command
+/gsd-progress --forensic             # Standard report + 6-check integrity audit
+```
+
+<CardGroup cols={3}>
+  <Card title="--next" icon="arrow-right">
+    Reads STATE.md and automatically dispatches the next logical command — discuss, plan, execute, verify, or ship — without asking.
+  </Card>
+  <Card title="--do" icon="wand-magic-sparkles">
+    Accepts a freeform description of what you want to do and routes it to the most appropriate GSD command.
+  </Card>
+  <Card title="--forensic" icon="microscope">
+    Appends a six-check integrity audit: STATE consistency, orphaned handoffs, deferred scope drift, memory-flagged pending work, blocking TODOs, and uncommitted code.
+  </Card>
+</CardGroup>
+
+## Complete lifecycle at a glance
+
+<Steps>
+  <Step title="Discuss">
+    `/gsd-discuss-phase N` → captures decisions → writes CONTEXT.md
+  </Step>
+  <Step title="Plan">
+    `/gsd-plan-phase N` → researches domain → decomposes work → writes PLAN.md files
+  </Step>
+  <Step title="Execute">
+    `/gsd-execute-phase N` → runs plans in parallel waves → writes code commits and SUMMARY.md files
+  </Step>
+  <Step title="Verify">
+    `/gsd-verify-work N` → runs acceptance tests → writes UAT.md and any fix plans
+  </Step>
+  <Step title="Ship">
+    `/gsd-ship N` → creates GitHub PR → updates STATE.md
+  </Step>
+</Steps>

@@ -1,0 +1,62 @@
+---
+title: "Open GSD: AI-Powered Development Workflow Suite"
+sidebarTitle: "Home"
+description: "Open GSD helps you plan, implement, verify, and ship software with AI agents. Three tools cover the full dev lifecycle: GSD Core, GSD Pi, and GSD Browser."
+---
+
+Open GSD is a suite of AI-powered developer tools designed to make working with AI coding agents fast, structured, and reliable. Whether you're wiring an AI runtime into a spec-driven pipeline, running an autonomous local coding agent, or giving an AI agent a powerful browser to work with — Open GSD has a tool for it.
+
+<CardGroup cols={3}>
+  <Card title="GSD Core" icon="layer-group" href="/core/introduction">
+    Spec-driven workflow engine for any AI coding runtime. Runs Research → Plan → Execute → Verify → Ship with 65+ slash commands.
+  </Card>
+  <Card title="GSD Pi" icon="robot" href="/pi/introduction">
+    Autonomous local coding agent with TUI, web UI, worktree-isolated Git, and multi-provider model routing.
+  </Card>
+  <Card title="GSD Browser" icon="browser" href="/browser/introduction">
+    Native CDP browser automation with MCP server mode, versioned element refs, and a live human-in-the-loop viewer.
+  </Card>
+</CardGroup>
+
+## Get Started
+
+<Steps>
+  <Step title="Choose your tool">
+    **GSD Core** if you already have an AI coding runtime (Claude Code, Cursor, Gemini CLI, etc.) and want a structured workflow on top of it. **GSD Pi** if you want a full standalone coding agent you run from your terminal. **GSD Browser** if you need browser automation for AI agents or CI pipelines.
+  </Step>
+  <Step title="Install in seconds">
+    All three tools install with a single command:
+
+    <CodeGroup>
+    ```bash GSD Core
+    npx @opengsd/gsd-core@latest
+    ```
+    ```bash GSD Pi
+    npx @opengsd/gsd-pi@latest
+    ```
+    ```bash GSD Browser
+    npm install -g @opengsd/gsd-browser
+    ```
+    </CodeGroup>
+  </Step>
+  <Step title="Start your first project">
+    Run the project initializer for your chosen tool and follow the interactive prompts to set up your first project.
+  </Step>
+</Steps>
+
+## Explore the Docs
+
+<CardGroup cols={2}>
+  <Card title="GSD Core Quickstart" icon="rocket" href="/core/quickstart">
+    Initialize a project, run your first phase, and ship a pull request.
+  </Card>
+  <Card title="GSD Pi Quickstart" icon="terminal" href="/pi/quickstart">
+    Start an autonomous coding session and let Pi plan and implement your first feature.
+  </Card>
+  <Card title="GSD Browser Quickstart" icon="globe" href="/browser/quickstart">
+    Launch the browser daemon, take a snapshot, and interact with a live page.
+  </Card>
+  <Card title="Command Reference" icon="book" href="/core/commands/workflow-commands">
+    Full reference for all GSD Core slash commands organized by namespace.
+  </Card>
+</CardGroup>

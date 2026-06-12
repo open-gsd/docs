@@ -1,0 +1,198 @@
+---
+title: "Git Worktree Isolation and Parallel Milestones in GSD Pi"
+sidebarTitle: "Worktrees"
+description: "Use Git worktree isolation to run milestones in dedicated checkouts, keep parallel work conflict-free, and merge cleanly back to main."
+---
+
+GSD Pi can isolate each milestone's work in its own Git worktree — a separate directory with its own branch, fully decoupled from your main checkout. This prevents in-progress work from bleeding into your dev environment and makes parallel milestone execution possible. Choose the isolation mode that best fits your project structure.
+
+## Isolation Modes
+
+GSD supports three isolation modes, set via `git.isolation` in your `PREFERENCES.md`:
+
+<CardGroup cols={3}>
+  <Card title="none" icon="circle-dot">
+    **Default.** Work happens directly on your current branch. No worktree or milestone branch is created. Best for hot-reload workflows or small projects where branch overhead isn't worth it.
+  </Card>
+  <Card title="worktree" icon="code-branch">
+    Each milestone gets its own directory at `.gsd-worktrees/<MID>/` (a sibling of `.gsd/` at your project root) on a `milestone/<MID>` branch. Work is fully isolated. Squash-merged to main on completion.
+  </Card>
+  <Card title="branch" icon="git-alt">
+    Work stays in the project root but on a `milestone/<MID>` branch. No separate directory. Useful for submodule-heavy repos where worktrees cause symlink problems.
+  </Card>
+</CardGroup>
+
+Set your preferred mode in `PREFERENCES.md`:
+
+```yaml
+git:
+  isolation: worktree   # "none" (default), "worktree", or "branch"
+```
+
+<Note>
+  Worktree mode requires at least one commit in the repository. In a zero-commit repo, GSD temporarily falls back to `none` mode until the first commit exists, then automatically resolves to `worktree`.
+</Note>
+
+### Worktree Location
+
+Newly created worktrees live at `<projectRoot>/.gsd-worktrees/<MID>/` — a sibling of the `.gsd/` state directory, kept at the project root regardless of where `.gsd` state is stored. This keeps every worktree visible next to your project and out of any external state location.
+
+<Info>
+  **Legacy location still works.** Worktrees created under the older `.gsd/worktrees/<MID>/` layout remain fully recognized for resolution, listing, merge, and teardown — no migration step is required. Only newly created worktrees use the canonical `.gsd-worktrees/` location, so in-flight milestones survive the upgrade unchanged.
+</Info>
+
+If you keep `.gsd/` ignored in your repo, add the canonical location to `.gitignore` as well (GSD does this automatically when `git.manage_gitignore: true`):
+
+```gitignore
+.gsd/
+.gsd-worktrees/
+```
+
+## Worktree CLI Commands
+
+Use these commands from your shell (outside a GSD session) to inspect and manage worktrees:
+
+```bash
+gsd worktree list            # List all GSD-managed worktrees
+gsd worktree merge [name]    # Merge a worktree back to main
+gsd worktree clean           # Remove only merged or empty worktrees
+gsd worktree remove <name>   # Remove a specific worktree
+gsd worktree remove <name> --force   # Force-remove even with unmerged changes
+```
+
+## In-Session Worktree Commands
+
+From inside an active GSD TUI session, use the `/gsd worktree` family of commands (alias: `/gsd wt`):
+
+| Command | Description |
+|---------|-------------|
+| `/gsd worktree list` | Show each worktree's branch, path, diff stats, commit count, and status |
+| `/gsd worktree merge [name]` | Merge a worktree into main and remove it afterward |
+| `/gsd worktree clean` | Remove merged or empty worktrees; keep anything with pending changes |
+| `/gsd worktree remove <name>` | Remove a named worktree and its branch |
+| `/gsd worktree remove <name> --force` | Force-remove, discarding unmerged or uncommitted work |
+
+<Warning>
+  `remove --force` permanently discards any unmerged commits and uncommitted changes in the worktree. Always review with `worktree list` before forcing removal.
+</Warning>
+
+## Starting a Session in a Specific Worktree
+
+Use the `--worktree` flag (short: `-w`) when launching GSD to open a session directly inside a named worktree:
+
+```bash
+gsd --worktree my-feature     # Start in the "my-feature" worktree
+gsd -w                        # Start in a new auto-named worktree
+```
+
+If you omit the name, GSD generates one automatically.
+
+## Merge Behavior
+
+When a worktree milestone completes, GSD handles the merge automatically:
+
+<Steps>
+  <Step title="Sequential commits on the milestone branch">
+    All task commits land on `milestone/<MID>` with conventional commit messages and `GSD-Task` trailers.
+  </Step>
+  <Step title="Squash merge to main">
+    By default, all commits are squashed into one clean commit on your main branch. Change this with `git.merge_strategy: merge` to preserve individual commits.
+  </Step>
+  <Step title="Worktree and branch cleanup">
+    The worktree directory and milestone branch are removed automatically after a successful merge.
+  </Step>
+</Steps>
+
+## Milestone Completion in Interactive Sessions
+
+When you complete a milestone interactively — by running `gsd_complete_milestone` from inside a chat or TUI session — GSD now closes out the milestone's Git state for you instead of leaving the working tree untouched.
+
+On every interactive milestone completion, GSD:
+
+1. **Auto-commits the dirty working tree** on the current branch with a conventional commit message and a `GSD-Unit: <milestoneId>` trailer, so the commit is recognizable as milestone closeout evidence. A clean tree is left alone.
+2. **Computes a Closeout Git Verdict** when `git.isolation` is `worktree` or `branch`, and surfaces one of two notices when the situation needs your attention:
+
+<CardGroup cols={2}>
+  <Card title="Needs attention — isolation bypassed" icon="triangle-exclamation">
+    The milestone was completed outside a `milestone/<MID>` worktree or branch even though `git.isolation` is `worktree` or `branch`. GSD commits the work where it sits and emits a warning naming the isolation preference that was not honored this session, so the milestone never closes silently on the wrong branch.
+  </Card>
+  <Card title="Merge deferred to worktree tooling" icon="code-merge">
+    The milestone was completed on its `milestone/<MID>` branch as expected. GSD commits the work and emits an info notice pointing you at `/gsd worktree merge` to land the branch on your integration branch.
+  </Card>
+</CardGroup>
+
+<Note>
+  Interactive closeout only fires on milestone boundaries. `gsd_task_complete` and `gsd_slice_complete` deliberately do **not** auto-commit — committing at every task or slice would sweep up unrelated working-tree changes. Auto-mode is also untouched: it keeps its existing closeout pipeline.
+</Note>
+
+A milestone closeout commit looks like this:
+
+```text
+chore: complete-milestone M003
+
+GSD-Unit: M003
+```
+
+## Parallel Milestones
+
+When you have independent milestones, you can run them simultaneously in separate worktrees. GSD's parallel orchestration engine manages worker processes, coordinates shared project state, and merges back to main when each milestone finishes.
+
+Use the `/gsd parallel` commands to manage parallel execution:
+
+| Command | Description |
+|---------|-------------|
+| `/gsd parallel start` | Analyze eligibility and spawn workers for ready milestones |
+| `/gsd parallel status` | Show all workers with their state, progress, and cost |
+| `/gsd parallel stop [MID]` | Stop all workers, or a specific milestone's worker |
+| `/gsd parallel pause [MID]` | Pause all workers, or a specific one |
+| `/gsd parallel resume [MID]` | Resume paused workers |
+| `/gsd parallel merge [MID]` | Merge completed milestones back to main |
+
+Enable parallel mode in your preferences before using these commands:
+
+```yaml
+parallel:
+  enabled: true
+  max_workers: 2        # 1–4 concurrent workers
+  budget_ceiling: 50.00 # Aggregate cost limit in USD (optional)
+  merge_strategy: "per-milestone"
+  auto_merge: "confirm" # "auto", "confirm", or "manual"
+```
+
+<Tip>
+  Run `/gsd parallel start` and GSD will show you an eligibility report before spawning any workers — including dependency checks and file overlap warnings for milestones that touch the same files.
+</Tip>
+
+## Safety Behavior
+
+<CardGroup cols={2}>
+  <Card title="Auto-commit before merge" icon="floppy-disk">
+    `worktree merge` auto-commits dirty files in the worktree before merging when possible, so you don't lose uncommitted work.
+  </Card>
+  <Card title="Conflict-aware merge" icon="shield-halved">
+    Merge stops and reports which files conflict rather than silently failing. Resolve manually, then retry with `/gsd parallel merge <MID>`.
+  </Card>
+  <Card title="Clean only safe worktrees" icon="broom">
+    `worktree clean` never removes worktrees with pending diffs or uncommitted changes — only merged or empty ones.
+  </Card>
+  <Card title="Detached HEAD protection" icon="lock">
+    Merge and worktree flows refuse to proceed from a detached project root. Check out your integration branch first.
+  </Card>
+</CardGroup>
+
+## Worktree Post-Create Hooks
+
+Run a custom script automatically after GSD creates a new worktree — useful for copying `.env` files, symlinking asset directories, or running setup commands the worktree doesn't inherit from the main tree:
+
+```yaml
+git:
+  worktree_post_create: .gsd/hooks/post-worktree-create
+```
+
+The hook receives two environment variables: `SOURCE_DIR` (the original project root) and `WORKTREE_DIR` (the newly created worktree path).
+
+```bash
+#!/bin/bash
+cp "$SOURCE_DIR/.env" "$WORKTREE_DIR/.env"
+ln -sf "$SOURCE_DIR/assets" "$WORKTREE_DIR/assets"
+```

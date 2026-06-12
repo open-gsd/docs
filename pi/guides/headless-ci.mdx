@@ -1,0 +1,213 @@
+---
+title: "GSD Pi Headless Mode: CI/CD, Cron Jobs, and Automation"
+sidebarTitle: "Headless & CI"
+description: "Run GSD Pi without a terminal UI for CI pipelines, cron jobs, and automation — with JSON output, exit codes, and remote question routing."
+---
+
+GSD Pi's headless mode removes the interactive TUI so you can pipe output, script automation, and run unattended workflows in CI/CD environments. All the same planning and execution logic runs — you just interact with it programmatically instead of through the terminal interface.
+
+## The `gsd headless` Command
+
+`gsd headless [subcommand]` is the main entry point for non-interactive use. It spawns a child GSD process in RPC mode, auto-responds to interactive prompts, and exits with a meaningful code when done.
+
+```bash
+# Run auto mode (default subcommand)
+gsd headless
+
+# Run a single unit of work
+gsd headless next
+
+# Instant JSON state snapshot — no LLM calls, ~50ms
+gsd headless query
+
+# Run auto mode with a 10-minute timeout
+gsd headless --timeout 600000 auto
+
+# Create a new milestone from a file and start auto mode
+gsd headless new-milestone --context brief.md --auto
+
+# Create a milestone from inline text
+gsd headless new-milestone --context-text "Build a REST API with JWT auth"
+
+# Pipe context from stdin
+echo "Build a CLI tool for CSV processing" | gsd headless new-milestone --context -
+```
+
+## Subcommands
+
+| Subcommand | Description |
+|------------|-------------|
+| `auto` | Run full auto mode (default when no subcommand given) |
+| `next` | Execute the next single unit of work |
+| `status` | Print current project state |
+| `new-milestone` | Create a new milestone (requires `--context` or `--context-text`) |
+| `query` | Return an instant JSON snapshot of project state |
+| `recover` | Reset DB hierarchy and reconstruct from markdown (non-TTY equivalent of `/gsd recover`) |
+| `dispatch <phase>` | Force-dispatch a specific phase |
+
+## Key Flags
+
+| Flag | Description |
+|------|-------------|
+| `--timeout N` | Overall timeout in milliseconds (default: 300000 / 5 min) |
+| `--json` | Stream all events as JSONL to stdout |
+| `--output-format <fmt>` | Output format for results |
+| `--bare` | Minimal output, no decoration |
+| `--resume <id>` | Resume a specific session by ID |
+| `--model ID` | Override the model for this headless session |
+| `--supervised` | Require human confirmation at key decision points |
+| `--response-timeout N` | Timeout for individual LLM responses |
+| `--answers <path>` | Path to a file of pre-written answers for interactive prompts |
+| `--events <types>` | Filter which event types to stream (comma-separated) |
+| `--context <path>` | Context file for `new-milestone` (use `-` for stdin) |
+| `--context-text <txt>` | Inline context text for `new-milestone` |
+| `--auto` | Chain into auto mode after milestone creation |
+| `--verbose` | Verbose output for debugging |
+| `--max-restarts N` | Auto-restart on crash with exponential backoff (default: 3) |
+
+## Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Success — work completed normally |
+| `1` | Error — timeout, crash, or unrecoverable failure |
+| `10` | Blocked — auto mode stopped because it needs input |
+| `11` | Cancelled — work was cancelled externally |
+
+<Tip>
+  Use exit code `10` in your CI script to detect when GSD has a question that requires human input. You can route those questions to Slack, Discord, or Telegram using the `remote_questions` configuration rather than failing the build.
+</Tip>
+
+## Instant State Snapshot with `query`
+
+`gsd headless query` returns a single JSON object describing the full project state without starting an LLM session. It's the recommended way for orchestrators and external scripts to inspect GSD state between runs.
+
+```bash
+gsd headless query | jq '.state.phase'
+# "executing"
+
+gsd headless query | jq '.next'
+# {"action":"dispatch","unitType":"execute-task","unitId":"M001/S01/T03"}
+
+gsd headless query | jq '.cost.total'
+# 4.25
+```
+
+The output includes `state` (current phase, active milestone, progress, blockers), `next` (the next dispatch action), and `cost` (per-worker and aggregate spend).
+
+## Streaming JSON Events
+
+Add `--json` to stream all session events as JSONL to stdout. This is useful for log aggregation, monitoring dashboards, and build pipelines that need structured output.
+
+```bash
+gsd headless --json auto > gsd-events.jsonl
+```
+
+To capture token telemetry separately:
+
+```bash
+PI_TOKEN_TELEMETRY=1 gsd headless --json auto \
+  > gsd-events.jsonl \
+  2> token-telemetry.jsonl
+```
+
+## Auto-Mode Without the TUI
+
+Use `gsd auto` as a shorthand for non-interactive auto mode with pipeable output:
+
+```bash
+gsd auto [args]
+```
+
+This is equivalent to `gsd headless auto` for most purposes and respects all the same flags.
+
+## GitHub Actions Example
+
+Here's a complete example workflow that runs GSD Pi in CI to continue work on a project, failing gracefully when blocked:
+
+```yaml
+name: GSD Auto Mode
+on:
+  schedule:
+    - cron: "0 2 * * *"   # Run nightly at 2 AM
+  workflow_dispatch:
+
+jobs:
+  gsd-auto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install GSD Pi
+        run: npm install -g @opengsd/gsd-pi@latest
+
+      - name: Configure provider credentials
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: echo "Provider configured via environment"
+
+      - name: Run GSD headless auto mode
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          gsd headless --timeout 3000000 --json auto \
+            > gsd-events.jsonl || EXIT_CODE=$?
+
+          echo "Exit code: ${EXIT_CODE:-0}"
+
+          if [ "${EXIT_CODE:-0}" -eq 10 ]; then
+            echo "GSD is blocked and needs input — check remote questions channel"
+            exit 0   # Don't fail the build for blocked state
+          fi
+
+          exit "${EXIT_CODE:-0}"
+
+      - name: Upload session log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gsd-events
+          path: gsd-events.jsonl
+```
+
+## Remote Questions for Unattended Runs
+
+When GSD needs to ask a question during headless auto mode, it can route that question to Slack, Discord, or Telegram instead of blocking the process. Configure `remote_questions` in your project's `PREFERENCES.md`:
+
+```yaml
+remote_questions:
+  channel: slack              # "slack", "discord", or "telegram"
+  channel_id: "C1234567890"
+  timeout_minutes: 15         # How long to wait for an answer (1–30)
+  poll_interval_seconds: 10   # How often to check for a reply (2–30)
+```
+
+With this configured, GSD posts the question to your chosen channel, waits for a reply, and continues execution. If no answer arrives within `timeout_minutes`, GSD exits with code `10`.
+
+<Note>
+  When `notifications.enabled: true` is set alongside a remote channel, informational notifications — milestone completions, budget alerts, blockers — are also sent to that channel, not just to the desktop.
+</Note>
+
+## Crash Recovery and Auto-Restart
+
+Headless auto mode restarts automatically on crash with exponential backoff (5s → 10s → 30s cap, default 3 attempts). Combined with GSD's database-backed state persistence, this enables true overnight "run until done" execution.
+
+```bash
+gsd headless --max-restarts 5 auto
+```
+
+Set `--max-restarts 0` to disable auto-restart. SIGINT and SIGTERM always bypass the restart logic and exit immediately.
+
+After a crash, run `gsd headless recover` to reset the DB hierarchy and rebuild state from rendered markdown before retrying:
+
+```bash
+gsd headless recover && gsd headless auto
+```

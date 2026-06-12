@@ -1,0 +1,247 @@
+---
+title: "GSD Browser Session, Daemon, and Vault Command Reference"
+sidebarTitle: "Sessions"
+description: "Reference for GSD Browser daemon, session state, viewer, and vault commands: health, save-state, restore-state, vault-save, vault-login."
+---
+
+Session management commands control the background daemon that powers every `gsd-browser` operation, named browser sessions that let you run parallel instances, the live authenticated viewer, and the encrypted credential vault. Most users never need to start or stop the daemon manually — it auto-starts on the first command and shuts down when no longer needed — but these commands give you full control when you need it.
+
+---
+
+## Daemon Commands
+
+The gsd-browser daemon is the long-running background process that owns the Chrome instance and handles all CDP communication. Each named session gets its own daemon process.
+
+### `gsd-browser daemon start`
+
+Start the background daemon. You rarely need to call this directly; any `gsd-browser` command will auto-start the daemon if one is not already running.
+
+```bash
+gsd-browser daemon start
+```
+
+**Example**
+
+```bash
+# Pre-warm the daemon before running your first command
+gsd-browser daemon start
+
+# Start a daemon for a named session
+gsd-browser daemon start --session staging
+```
+
+---
+
+### `gsd-browser daemon stop`
+
+Stop the running daemon for the current (or specified) session. The Chrome process managed by that daemon is also terminated.
+
+```bash
+gsd-browser daemon stop
+```
+
+**Example**
+
+```bash
+# Stop the default session daemon
+gsd-browser daemon stop
+
+# Stop a named session daemon
+gsd-browser daemon stop --session staging
+```
+
+---
+
+### `gsd-browser daemon health`
+
+Check whether the daemon is running and healthy. Returns the daemon status and any error reason. This command does not start the daemon if it is not already running.
+
+```bash
+gsd-browser daemon health
+```
+
+**Example**
+
+```bash
+gsd-browser daemon health
+# Daemon: running
+
+# Get structured output for scripting
+gsd-browser daemon health --json
+```
+
+---
+
+## Session State Commands
+
+Use `--session <name>` on any command to target a named parallel browser instance. Named sessions share no cookies, storage, or page state with each other. The following commands let you persist and restore an entire browser context (cookies, localStorage, sessionStorage) across runs.
+
+### `gsd-browser save-state`
+
+Save the current browser context (cookies, local storage, session storage) to disk under a named profile.
+
+```bash
+gsd-browser save-state [--name <name>]
+```
+
+<ParamField query="--name" type="string">
+  Profile name for the saved state. Defaults to `"default"` when omitted.
+</ParamField>
+
+**Example**
+
+```bash
+# Log in, then save state so you can restore it later
+gsd-browser navigate https://example.com/login --session work
+# ... complete login ...
+gsd-browser save-state --name work-authenticated
+```
+
+---
+
+### `gsd-browser restore-state`
+
+Restore a previously saved browser context from disk, loading cookies and storage without navigating or logging in again.
+
+```bash
+gsd-browser restore-state [--name <name>]
+```
+
+<ParamField query="--name" type="string">
+  Profile name of the state to restore. Defaults to `"default"` when omitted.
+</ParamField>
+
+**Example**
+
+```bash
+# Restore a logged-in session from a prior save
+gsd-browser restore-state --name work-authenticated
+gsd-browser navigate https://example.com/dashboard
+# Lands directly on the dashboard (already logged in)
+```
+
+---
+
+## Viewer Commands
+
+The live viewer lets you watch and interact with an active browser session through a web-based UI, protected by a rotating auth token. Share the viewer URL with a teammate to give them real-time visibility into an automation run.
+
+### `gsd-browser view`
+
+Open the live viewer for the current session. GSD Browser prints a localhost URL and opens it in your default browser.
+
+```bash
+gsd-browser view [flags]
+```
+
+<ParamField query="--print-only" type="flag">
+  Print the viewer URL without opening it in a browser. Useful when you need to pass the URL to another tool.
+</ParamField>
+
+<ParamField query="--history" type="flag">
+  Open the history-focused viewer, showing a scrollable timeline of past actions rather than the live frame.
+</ParamField>
+
+**Example**
+
+```bash
+# Open the live viewer
+gsd-browser view
+
+# Get the URL without opening it
+VIEW_URL=$(gsd-browser view --print-only | tail -1)
+echo "$VIEW_URL"
+```
+
+<Warning>
+  The viewer URL contains an authentication token. Treat it like a password — do not commit it to source control or share it in public channels.
+</Warning>
+
+---
+
+## Vault Commands
+
+The vault stores credentials encrypted at rest, keyed by a profile name. The daemon decrypts credentials only when needed to perform a login. Set the `GSD_BROWSER_VAULT_KEY` environment variable before starting the daemon to enable vault encryption.
+
+### `gsd-browser vault-save`
+
+Store a set of credentials in the encrypted vault under a profile name.
+
+```bash
+gsd-browser vault-save --profile <name> --url <url> --username <user> --password <pass>
+```
+
+<ParamField query="--profile" type="string" required>
+  A unique profile name for this credential set (e.g. `my-app-prod`).
+</ParamField>
+
+<ParamField query="--url" type="string" required>
+  The login URL for this credential profile.
+</ParamField>
+
+<ParamField query="--username" type="string" required>
+  The username or email address for this credential.
+</ParamField>
+
+<ParamField query="--password" type="string" required>
+  The password. This value is encrypted at rest using the `GSD_BROWSER_VAULT_KEY` environment variable.
+</ParamField>
+
+**Example**
+
+```bash
+# Store credentials for the production app
+export GSD_BROWSER_VAULT_KEY="my-secret-encryption-key"
+gsd-browser vault-save \
+  --profile my-app-prod \
+  --url https://example.com/login \
+  --username admin@example.com \
+  --password "s3cr3t!"
+```
+
+---
+
+### `gsd-browser vault-list`
+
+List all vault profile names. Credentials (usernames and passwords) are never shown.
+
+```bash
+gsd-browser vault-list
+```
+
+**Example**
+
+```bash
+gsd-browser vault-list
+# my-app-prod
+# my-app-staging
+```
+
+---
+
+### `gsd-browser vault-login`
+
+Navigate to the login URL stored in a vault profile and automatically fill and submit the login form using the stored credentials.
+
+```bash
+gsd-browser vault-login --profile <name>
+```
+
+<ParamField query="--profile" type="string" required>
+  The profile name of the credentials to use for login.
+</ParamField>
+
+**Example**
+
+```bash
+# Log in to the production app using stored credentials
+gsd-browser vault-login --profile my-app-prod
+
+# Verify login succeeded
+gsd-browser wait-for --condition url_contains --value "/dashboard"
+gsd-browser screenshot --output ./login-success.png
+```
+
+<Tip>
+  Combine `vault-login` with `save-state` to capture an authenticated browser state that you can restore with `restore-state` in future runs, avoiding repeated login flows.
+</Tip>

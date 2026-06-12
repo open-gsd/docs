@@ -1,0 +1,137 @@
+---
+title: "Bootstrap a New Codebase or Repository with GSD Pi"
+sidebarTitle: "New Project"
+description: "Bootstrap a new GSD Pi project, generate a milestone roadmap, and kick off autonomous implementation — from a blank directory in minutes."
+---
+
+GSD Pi's project bootstrapping flow takes you from a blank directory to a structured plan with milestones, slices, and tasks — all stored in a `.gsd/` directory that acts as the living brain of your project. Whether you're starting something greenfield or formalizing an existing codebase, `/gsd new-project` is the entry point.
+
+## Starting a New Project
+
+<Steps>
+  <Step title="Open a terminal in your project directory">
+    Navigate to the root of the repository (or an empty folder for a greenfield project) and start a GSD session.
+
+    ```bash
+    cd path/to/your-project
+    gsd
+    ```
+  </Step>
+
+  <Step title="Run the new-project command">
+    Inside the GSD session, run the bootstrapping command. Add `--deep` to trigger a staged discovery flow that gathers deeper context before planning.
+
+    <CodeGroup>
+      ```text Standard
+      /gsd new-project
+      ```
+
+      ```text Deep discovery
+      /gsd new-project --deep
+      ```
+    </CodeGroup>
+
+    <Tip>
+      Use `--deep` for complex projects, greenfield builds, or any time you want GSD to ask detailed questions about workflow preferences, requirements, and architecture before planning milestones.
+    </Tip>
+  </Step>
+
+  <Step title="Describe your project goals">
+    GSD will prompt you for the information it needs. Be as specific as you like about:
+
+    - What the project does and who it's for
+    - Your preferred tech stack and languages
+    - Constraints, non-goals, and anti-patterns to avoid
+    - Any existing code GSD should understand before planning
+
+    The more context you provide here, the better the generated plan will match your intentions.
+  </Step>
+
+  <Step title="Review the generated .gsd/ directory">
+    After your conversation, GSD creates the `.gsd/` directory with everything it needs to manage the project:
+
+    | File | Purpose |
+    |------|---------|
+    | `STATE.md` | Current project phase and active milestone |
+    | `DECISIONS.md` | Architectural decisions and rationale |
+    | `CODEBASE.md` | Auto-generated codebase summary |
+    | `M001-ROADMAP.md` | The first milestone's slice-by-slice plan |
+    | `M001-CONTEXT.md` | Milestone-level context GSD injects into prompts |
+
+    In **deep mode**, you'll also see:
+
+    | File | Purpose |
+    |------|---------|
+    | `PROJECT.md` | Vision, users, anti-goals, and constraints |
+    | `REQUIREMENTS.md` | Capability contract with `R###`-numbered requirements |
+    | `research/STACK.md` | Stack and tooling research |
+    | `research/ARCHITECTURE.md` | Architectural patterns and trade-offs |
+  </Step>
+
+  <Step title="Adjust the roadmap if needed">
+    Open `M001-ROADMAP.md` and review the generated milestones and slices. You can edit this file directly or use `/gsd discuss` to talk through any changes with GSD before committing to the plan.
+
+    To reorganize or reorder milestones interactively, run:
+
+    ```text
+    /gsd rethink
+    ```
+  </Step>
+
+  <Step title="Start autonomous implementation">
+    When you're happy with the plan, kick off auto mode:
+
+    ```text
+    /gsd auto
+    ```
+
+    GSD will research, plan, execute, commit, and repeat — handling the full milestone lifecycle until it finishes or needs your input.
+  </Step>
+</Steps>
+
+## Starting a New Milestone on an Existing Project
+
+Once your project is bootstrapped, use `/gsd new-milestone` to plan the next major chunk of work without losing any existing state.
+
+```text
+/gsd new-milestone
+```
+
+Add `--deep` to run the staged discovery flow for the new milestone, which is useful when the scope has shifted significantly or you're entering a new domain.
+
+```text
+/gsd new-milestone --deep
+```
+
+<Note>
+  `/gsd new-milestone --deep` writes `planning_depth: deep` to `.gsd/PREFERENCES.md` so that all future milestones on this project also use the deep planning flow by default. You can remove or override this setting at any time.
+</Note>
+
+## Managing Your Milestone Queue
+
+After creating multiple milestones, use the queue commands to prioritize and reorder work:
+
+```text
+/gsd queue
+```
+
+This opens an interactive view of all pending milestones. You can change their order, park milestones you're not ready for yet, or discard ones that are no longer relevant.
+
+## What Happens Under the Hood
+
+<Accordion title="Deep planning mode: staged discovery flow">
+  When you run `/gsd new-project --deep`, GSD runs a multi-step discovery sequence before any milestone planning begins:
+
+  1. **Workflow preferences** — captures how you like to work (test-first, documentation style, commit conventions)
+  2. **Project context** — writes `.gsd/PROJECT.md` with vision, users, and anti-goals
+  3. **Requirements** — writes `.gsd/REQUIREMENTS.md` with structured `R###`-numbered requirements
+  4. **Research decision** — decides whether to do deep technical research or proceed directly to planning
+  5. **Optional project research** — if research is warranted, generates `STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, and `PITFALLS.md` under `.gsd/research/`
+  6. **Milestone planning** — generates the first milestone's context and roadmap using all the above as input
+</Accordion>
+
+<Accordion title="The .gsd/ directory structure">
+  GSD uses `.gsd/` as the single source of truth for project state. The markdown files are human-readable projections you can review, edit, and commit alongside your code.
+
+  You can commit `.gsd/` files to git to share planning artifacts with your team. Set `git.commit_docs: false` in preferences if you want to keep them local-only.
+</Accordion>

@@ -1,0 +1,223 @@
+---
+title: "GSD Core Model Profiles: Tiers, Routing, and Effort"
+sidebarTitle: "Model Profiles"
+description: "Assign model tiers to agents with built-in profiles, use dynamic routing to escalate on failure, and tune per-agent effort for cost-effective AI usage."
+---
+
+GSD Core assigns a model tier to each of its specialized agents based on the active model profile. Rather than running every agent on the most expensive model, profiles let you allocate compute intentionally — Opus for the agents where reasoning quality drives the outcome, Sonnet for workhorses, and Haiku for fast scanners and mappers. Dynamic routing and effort control let you push that further: start cheap and escalate only when an agent fails its quality gate.
+
+## Built-in profiles
+
+Set `model_profile` in `config.json` or switch profiles instantly with `/gsd-config --profile <name>`.
+
+<Tabs>
+  <Tab title="quality">
+    Uses Opus for all decision-making agents and Sonnet for verification. Best for quota-rich environments and critical architecture work where output quality is the top priority.
+  </Tab>
+  <Tab title="balanced">
+    Uses Opus for planning agents only and Sonnet for everything else. The default profile for most development work — strong planning quality at a reasonable cost.
+  </Tab>
+  <Tab title="budget">
+    Uses Sonnet for code-writing and Haiku for research and verification. Ideal for high-volume work, less critical phases, or when API costs are a constraint.
+  </Tab>
+  <Tab title="adaptive">
+    Biases toward Opus for agents where reasoning quality matters most (planner, debugger) and Haiku for lightweight tasks. A middle path between quality and budget.
+  </Tab>
+  <Tab title="inherit">
+    All agents use the current session model. Use this for non-Anthropic providers (OpenRouter, local models) or when you want to control the model entirely from your runtime's configuration.
+  </Tab>
+</Tabs>
+
+## Agent tier assignments
+
+The table below shows how the five most-used agents resolve under each profile. The tier names (Opus, Sonnet, Haiku) are resolved to runtime-native model IDs when `runtime` is set in `config.json`.
+
+| Agent | `quality` | `balanced` | `budget` | `adaptive` | `inherit` |
+|-------|-----------|------------|----------|------------|-----------|
+| `gsd-planner` | Opus | Opus | Sonnet | Opus | Inherit |
+| `gsd-executor` | Opus | Sonnet | Sonnet | Sonnet | Inherit |
+| `gsd-phase-researcher` | Opus | Sonnet | Haiku | Sonnet | Inherit |
+| `gsd-verifier` | Sonnet | Sonnet | Haiku | Sonnet | Inherit |
+| `gsd-codebase-mapper` | Sonnet | Haiku | Haiku | Haiku | Inherit |
+
+<Note>
+  The full catalog covers all 33 shipped agents with explicit per-profile tier assignments. These five represent the most frequently invoked agents during a standard phase lifecycle.
+</Note>
+
+### Per-agent overrides
+
+Override individual agents without changing the profile for everything else. This is useful when you want one agent to use a more powerful model than the profile assigns.
+
+```json
+{
+  "model_profile": "balanced",
+  "model_overrides": {
+    "gsd-executor": "opus",
+    "gsd-codebase-mapper": "haiku"
+  }
+}
+```
+
+Valid override values: `opus`, `sonnet`, `haiku`, `inherit`, or a fully-qualified model ID such as `"openai/o3"` or `"google/gemini-2.5-pro"`.
+
+### Per-phase-type model assignment
+
+The `models` block lets you tune at the phase level without knowing individual agent names. Specify a tier for each phase type and GSD applies it to all agents in that category.
+
+```json
+{
+  "model_profile": "balanced",
+  "models": {
+    "planning": "opus",
+    "research": "sonnet",
+    "execution": "opus",
+    "verification": "sonnet"
+  }
+}
+```
+
+| Phase type | Agents included |
+|------------|-----------------|
+| `planning` | `gsd-planner`, `gsd-roadmapper`, `gsd-pattern-mapper` |
+| `research` | `gsd-phase-researcher`, `gsd-project-researcher`, `gsd-codebase-mapper`, `gsd-ui-researcher` |
+| `execution` | `gsd-executor`, `gsd-debugger`, `gsd-doc-writer` |
+| `verification` | `gsd-verifier`, `gsd-plan-checker`, `gsd-nyquist-auditor`, `gsd-ui-checker` |
+
+**Resolution precedence (highest to lowest):**
+
+1. `model_overrides[<agent>]` — per-agent exception, wins over everything
+2. `dynamic_routing.tier_models[<tier>]` — when dynamic routing is enabled
+3. `models[<phase_type>]` — coarse phase-level tier
+4. `model_profile` — global profile tier per agent
+5. Runtime default
+
+## Dynamic routing with failure-tier escalation
+
+Dynamic routing lets agents start on a cheaper tier and escalate automatically when the orchestrator detects a soft failure (plan-check FLAG, verification inconclusive). Enable it with `dynamic_routing.enabled: true`.
+
+```json
+{
+  "dynamic_routing": {
+    "enabled": true,
+    "tier_models": {
+      "light":    "haiku",
+      "standard": "sonnet",
+      "heavy":    "opus"
+    },
+    "escalate_on_failure": true,
+    "max_escalations": 1
+  }
+}
+```
+
+Each agent is pre-assigned to one of three default tiers based on its role:
+
+| Tier | Examples | Use case |
+|------|----------|----------|
+| `light` | `gsd-codebase-mapper`, `gsd-nyquist-auditor`, `gsd-plan-checker` | Fast mappers, scanners, low-stakes audits |
+| `standard` | `gsd-executor`, `gsd-verifier`, `gsd-phase-researcher` | Default workhorse agents |
+| `heavy` | `gsd-planner`, `gsd-roadmapper`, `gsd-debugger` | Deep reasoning — these agents are already at the top tier |
+
+<Accordion title="Dynamic routing settings reference">
+  | Key | Type | Default | Description |
+  |-----|------|---------|-------------|
+  | `dynamic_routing.enabled` | boolean | `false` | Master switch. `true` activates the dynamic resolver. |
+  | `dynamic_routing.tier_models.light` | tier alias | (none) | Model for the light tier, typically `haiku`. |
+  | `dynamic_routing.tier_models.standard` | tier alias | (none) | Model for the standard tier, typically `sonnet`. |
+  | `dynamic_routing.tier_models.heavy` | tier alias | (none) | Model for the heavy tier, typically `opus`. |
+  | `dynamic_routing.escalate_on_failure` | boolean | `true` | When `false`, every attempt uses the default tier regardless of failure. |
+  | `dynamic_routing.max_escalations` | integer | `1` | Hard cap on retry escalations per agent invocation. |
+</Accordion>
+
+## Effort control
+
+Control the reasoning effort of each agent invocation independently of model tier. The universal effort ladder is:
+
+```
+minimal < low < medium < high < xhigh < max
+```
+
+Effort is rendered per-runtime: `output_config.effort` for Claude, `model_reasoning_effort` for Codex. Cross-provider clamping applies: `max` is Anthropic-only and clamps to `xhigh` on Codex; `minimal` is Codex-only and clamps to `low` on Claude.
+
+```json
+{
+  "effort": {
+    "default": "high",
+    "routing_tier_defaults": {
+      "light":    "low",
+      "standard": "high",
+      "heavy":    "xhigh"
+    },
+    "agent_overrides": {
+      "gsd-planner": "max"
+    }
+  }
+}
+```
+
+<Accordion title="Effort settings reference">
+  | Key | Default | Description |
+  |-----|---------|-------------|
+  | `effort.default` | `"high"` | Global fallback effort level when no tier or agent override matches. |
+  | `effort.routing_tier_defaults.light` | `"low"` | Effort for light-tier agents. |
+  | `effort.routing_tier_defaults.standard` | `"high"` | Effort for standard-tier agents. |
+  | `effort.routing_tier_defaults.heavy` | `"xhigh"` | Effort for heavy-tier agents. |
+  | `effort.agent_overrides.<agent-id>` | (none) | Per-agent effort override; beats all tier defaults. |
+</Accordion>
+
+**Effort precedence (highest to lowest):**
+
+1. Invocation override (e.g. `--effort` flag on `resolve-execution`)
+2. `effort.agent_overrides[<agent-id>]`
+3. `effort.routing_tier_defaults[<light|standard|heavy>]`
+4. `effort.default`
+5. `"high"` (universal default)
+
+## Model policy presets
+
+Model policy presets let you pick a provider family and a budget level, and have GSD materialize the concrete `(opus, sonnet, haiku)` tier mappings for you — no need to spell out every model ID by hand. Use a preset when you want a known-good mapping for a given vendor; fall back to `generic` when you want full control over individual model IDs.
+
+```json
+{
+  "model_policy": {
+    "provider": "anthropic",
+    "budget": "high"
+  }
+}
+```
+
+| Key | Type | Values | Description |
+|-----|------|--------|-------------|
+| `model_policy.provider` | enum | `openai`, `anthropic`, `anthropic-fable`, `google`, `qwen`, `generic` | Declares the model provider. Known providers unlock catalog-backed presets. `generic` treats all model IDs as opaque strings — no prefix inference, no reasoning-effort defaults. |
+| `model_policy.budget` | enum | `high`, `medium`, `low` | Selects a budget tier when using a known provider. GSD materializes the matching catalog preset into explicit tier mappings at resolve time. Ignored when `provider` is `generic`. |
+| `model_policy.high` / `medium` / `low` | string | model ID | Tier model IDs for `generic` provider only. |
+
+### Anthropic presets
+
+GSD ships two Anthropic-family presets so you can decide whether to stay on the standard Opus 4.8 lineup or opt into Claude Fable 5 for top-tier routing. Both presets share the Sonnet 4.6 and Haiku 4.5 fallback tiers; they only differ at the high end.
+
+| Provider | Budget | high | medium | low |
+|----------|--------|------|--------|-----|
+| `anthropic` | high | `claude-opus-4-8` | `claude-opus-4-8` | `claude-sonnet-4-6` |
+| `anthropic` | medium | `claude-opus-4-8` | `claude-sonnet-4-6` | `claude-haiku-4-5` |
+| `anthropic` | low | `claude-haiku-4-5` | `claude-haiku-4-5` | `claude-haiku-4-5` |
+| `anthropic-fable` | high | `claude-fable-5` | `claude-fable-5` | `claude-sonnet-4-6` |
+| `anthropic-fable` | medium | `claude-opus-4-8` | `claude-sonnet-4-6` | `claude-haiku-4-5` |
+| `anthropic-fable` | low | `claude-haiku-4-5` | `claude-haiku-4-5` | `claude-haiku-4-5` |
+
+Use `anthropic-fable` when you want Claude Fable 5 — an Opus-tier model with a 1M-token context window, 128K max output, and adaptive thinking at the `xhigh` effort level — to handle high-budget Opus and Sonnet routing. The `medium` and `low` budgets fall back to the same Opus 4.8 / Sonnet 4.6 / Haiku 4.5 mix as the standard `anthropic` preset, so opting in only affects the top tier.
+
+<Tip>
+  Claude Fable 5 is available through Anthropic direct, Anthropic on Vertex AI, Amazon Bedrock, and OpenRouter. Make sure your selected runtime can reach at least one of those providers before switching to the `anthropic-fable` preset.
+</Tip>
+
+If you set `context_window: 1000000` to use Claude Fable 5's full 1M-token window, GSD also enables adaptive context enrichment (deeper SUMMARY.md and anti-pattern reads).
+
+## Profile philosophy
+
+| Profile | Philosophy | When to use |
+|---------|-----------|-------------|
+| `quality` | Opus for all decision-making, Sonnet for verification | Quota available; critical architecture work |
+| `balanced` | Opus for planning only, Sonnet for everything else | Normal development (recommended default) |
+| `budget` | Sonnet for code-writing, Haiku for research/verification | High-volume work, less critical phases |
+| `inherit` | All agents follow the session model | Non-Anthropic providers, OpenRouter, local models |

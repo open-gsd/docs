@@ -1,0 +1,76 @@
+---
+title: "GSD Core: Spec-Driven Development for AI Coding Agents"
+sidebarTitle: "Introduction"
+description: "GSD Core is a spec-driven framework that keeps AI coding agents on track across sessions — fresh context, persistent artifacts, and verified output."
+---
+
+GSD Core is a lightweight meta-prompting, context-engineering, and spec-driven development framework that sits on top of any AI coding runtime. Rather than replacing your editor or AI assistant, GSD Core gives it structure: a repeatable phase loop, a set of specialist subagents, and a `.planning/` directory of human-readable artifacts that survive every session boundary, every `/clear`, and every context reset.
+
+## The problem GSD Core solves
+
+Most AI-coding setups work well for small tasks but degrade silently as projects grow. Three forces cause the breakdown:
+
+**Context rot.** As a conversation grows, the AI fills its context window with accumulated back-and-forth. Recall weakens, reasoning degrades, and output quality quietly drops — without any warning to you or the model.
+
+**No shared memory between sessions.** Start a new session and the AI knows nothing about yesterday's decisions, your architecture choices, or the bugs you already ruled out. You spend the first ten minutes re-explaining what already happened.
+
+**No verification that code works.** Most AI coding flows end at "execution complete." Nothing checks that what was built actually satisfies the requirements, passes tests, or matches the design you approved.
+
+GSD Core solves all three. Heavy research, planning, and execution work runs in fresh-context subagents so context rot never accumulates. Structured artifacts like `STATE.md`, `CONTEXT.md`, and `continue-here.md` persist everything important across session boundaries. And the Verify step walks through what was built, diagnoses gaps, and generates fix plans before a phase is declared done.
+
+## Supported runtimes
+
+GSD Core installs its commands, agents, and hooks into whichever AI coding runtime you use. The same phase loop and artifact structure work across all of them.
+
+<CardGroup cols={3}>
+  <Card title="Claude Code" icon="code" />
+  <Card title="OpenCode" icon="code" />
+  <Card title="Gemini CLI" icon="code" />
+  <Card title="Kilo" icon="code" />
+  <Card title="Codex" icon="code" />
+  <Card title="GitHub Copilot" icon="code" />
+  <Card title="Cursor" icon="code" />
+  <Card title="Windsurf" icon="code" />
+  <Card title="Antigravity" icon="code" />
+  <Card title="Cline" icon="code" />
+  <Card title="Augment Code" icon="code" />
+  <Card title="Trae" icon="code" />
+  <Card title="Qwen Code" icon="code" />
+  <Card title="Hermes Agent" icon="code" />
+  <Card title="CodeBuddy" icon="code" />
+</CardGroup>
+
+<Note>
+  The installer handles all runtime-specific adaptation at install time. You never need to copy or modify files from the `agents/` or `commands/` directories manually.
+</Note>
+
+## How it works
+
+GSD Core structures every milestone as a repeatable five-step loop, one phase at a time:
+
+1. **Discuss** — capture your implementation decisions before anything is planned
+2. **Plan** — run parallel research agents, decompose work into atomic tasks, verify the plan fits a fresh context window
+3. **Execute** — run plans in parallel execution waves; each executor starts with a clean context window of up to 200K tokens
+4. **Verify** — walk through what was built, run tests, diagnose gaps, and produce fix plans before declaring done
+5. **Ship** — create the PR, archive the phase artifacts, and move to the next phase
+
+Each step produces artifacts that feed the next. Nothing is held in conversation memory — everything is written to disk in `.planning/` as plain Markdown and JSON.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card
+    title="Installation"
+    icon="download"
+    href="/core/installation"
+  >
+    Install GSD Core with one command and walk through the interactive setup for your runtime.
+  </Card>
+  <Card
+    title="Quickstart"
+    icon="play"
+    href="/core/quickstart"
+  >
+    Initialize your first project, run the five-step phase loop, and ship your first PR.
+  </Card>
+</CardGroup>

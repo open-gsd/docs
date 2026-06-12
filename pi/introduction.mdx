@@ -1,0 +1,94 @@
+---
+title: "GSD Pi: Autonomous Local-First Coding Agent for CLI"
+sidebarTitle: "Introduction"
+description: "GSD Pi is a command-line coding agent that plans, implements, verifies, and ships software autonomously — from idea to pull request."
+---
+
+GSD Pi is a local-first, autonomous coding agent you run from the command line. It handles the full software development lifecycle — breaking your goals into milestones, slices, and tasks, then planning, implementing, verifying, committing, and reporting on the work — all from your terminal. You stay in control: run it fully autonomously and check back when it's done, or stay hands-on and step through each unit of work interactively.
+
+## What GSD Pi Does
+
+Pi takes a project goal and decomposes it into a structured hierarchy of work:
+
+- **Milestones** — shippable increments that each move your project meaningfully forward
+- **Slices** — coherent units of work within a milestone, planned and executed together
+- **Tasks** — atomic implementation units that a single agent session completes and commits
+
+Once the work is decomposed, Pi runs the loop: plan → implement → verify → commit → reassess → advance — repeating until the milestone is done or you intervene.
+
+<CardGroup cols={2}>
+  <Card title="Autonomous Execution" icon="robot">
+    Let Pi run unattended through planning, coding, testing, and committing with `/gsd auto`.
+  </Card>
+  <Card title="Interactive Control" icon="hand">
+    Step through work unit by unit, inspect state, steer the plan, and resume at any time.
+  </Card>
+  <Card title="Git-Native Workflow" icon="code-branch">
+    Pi isolates milestone work in git worktrees, commits with meaningful messages, and creates PRs when you're ready to ship.
+  </Card>
+  <Card title="Local Project Memory" icon="database">
+    All state, decisions, plans, and knowledge live in `.gsd/` — human-readable markdown backed by a local SQLite database.
+  </Card>
+</CardGroup>
+
+## Interfaces
+
+Pi ships with three ways to interact, depending on your workflow:
+
+<Tabs>
+  <Tab title="TUI (Default)">
+    The terminal UI is the default interface. Run `gsd` to open it — you get a full interactive session with a live dashboard, slash commands, keyboard shortcuts, and real-time progress tracking.
+
+    ```bash
+    gsd
+    ```
+  </Tab>
+  <Tab title="Web UI">
+    Launch the browser-based control plane with `gsd --web`. It offers the same project management surface as the TUI with a visual workflow dashboard.
+
+    ```bash
+    gsd --web
+    ```
+  </Tab>
+  <Tab title="Headless / CI">
+    Run Pi without any UI in CI pipelines, cron jobs, or scripts using `gsd headless`. It streams structured JSONL events, auto-responds to prompts, and exits with meaningful codes.
+
+    ```bash
+    gsd headless auto
+    ```
+  </Tab>
+</Tabs>
+
+## Key Capabilities
+
+<AccordionGroup>
+  <Accordion title="Multi-Provider Model Routing">
+    Pi works with the LLM provider your team already uses. Supported providers include:
+
+    **Cloud APIs:** Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, Groq, xAI (Grok), Mistral, GitHub Copilot, Amazon Bedrock, Vertex AI, Azure OpenAI
+
+    **Local / Self-Hosted:** Ollama, LM Studio, vLLM, SGLang
+
+    You configure models per phase — a powerful model for planning and a faster model for simpler tasks — and Pi handles routing automatically. Dynamic routing can further optimize cost by selecting cheaper models for lightweight work.
+  </Accordion>
+  <Accordion title="Git Worktree Isolation">
+    Pi runs each milestone in its own git worktree, keeping implementation work isolated from your main checkout. When the milestone completes, Pi squash-merges the work as one clean commit and removes the worktree. Your main branch stays reviewable throughout.
+  </Accordion>
+  <Accordion title="Extension System">
+    Pi's capabilities expand through extensions. Bundled extensions add browser automation, background shell processes, MCP protocol support, web search, voice transcription, visual context capture, GitHub sync, and more. You can install community extensions from npm or build your own.
+  </Accordion>
+  <Accordion title="Knowledge Graph & Local Memory">
+    Pi accumulates project knowledge across sessions — architectural decisions, patterns, lessons learned, and codebase understanding — stored in a local SQLite database and projected into human-readable markdown for review and git history.
+  </Accordion>
+  <Accordion title="Budget & Cost Controls">
+    Set a spending ceiling and choose how Pi enforces it: warn and continue, pause for review, or halt immediately. Dynamic model routing can reduce token consumption by 20–50% by using lighter models for simpler work.
+  </Accordion>
+</AccordionGroup>
+
+## How It Fits Into Your Workflow
+
+Pi is designed to work alongside your existing tools, not replace them. It reads and writes your codebase directly, uses git for all version control, runs your existing test and lint commands for verification, and produces PR-ready branches. You review the output in your normal code review workflow — Pi just does the implementation work.
+
+<Note>
+  Pi stores all project state under `.gsd/` in your project root. This directory contains a SQLite database as the runtime source of truth, plus markdown projections of plans, decisions, summaries, and knowledge for human review.
+</Note>

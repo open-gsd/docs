@@ -1,0 +1,184 @@
+---
+title: "Expose GSD Pi Tools via MCP Server to AI Coding Clients"
+sidebarTitle: "MCP Server"
+description: "Expose GSD Pi's full workflow toolset to Claude Desktop, VS Code Copilot, Cursor, and any MCP-compatible client via stdin/stdout or HTTP."
+---
+
+GSD Pi can run as a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server, exposing its planning, execution, and workflow tools to any MCP-compatible AI client. This lets you use GSD Pi's structured project management capabilities — milestone planning, task completion, slice management, roadmap reassessment — directly from Claude Desktop, VS Code Copilot, Cursor, or any other client that supports MCP.
+
+## Starting GSD Pi as an MCP Server
+
+Run GSD Pi in MCP server mode over stdin/stdout:
+
+```bash
+gsd --mode mcp
+```
+
+The server registers all tools from the GSD agent session and maps MCP `tools/list` and `tools/call` requests to GSD tool definitions. It runs until the transport closes.
+
+## Configuring MCP Clients
+
+### Automatic Setup
+
+When GSD detects a Claude Code model during startup, it automatically writes a `.mcp.json` file in your project root with the GSD workflow MCP server configured. No manual steps are needed — start GSD once with Claude Code as the provider and the config is created for you.
+
+You can also trigger this manually from inside a GSD session:
+
+```text
+/gsd mcp init
+```
+
+### Manual Configuration
+
+Add GSD Pi to your project's `.mcp.json` file:
+
+```json
+{
+  "mcpServers": {
+    "gsd": {
+      "command": "gsd",
+      "args": ["--mode", "mcp"]
+    }
+  }
+}
+```
+
+For HTTP transport (connecting to a running GSD server):
+
+```json
+{
+  "mcpServers": {
+    "gsd": {
+      "url": "http://localhost:3000/mcp"
+    }
+  }
+}
+```
+
+<Tip>
+  Use `.mcp.json` for shared team configuration you want to commit to the repository. Use `.gsd/mcp.json` for local-only configuration with machine-specific paths or personal credentials.
+</Tip>
+
+## Supported Clients
+
+<CardGroup cols={2}>
+  <Card title="Claude Desktop" icon="robot">
+    Add the `gsd` server entry to your Claude Desktop MCP configuration. GSD's full workflow tool surface becomes available in every Claude conversation.
+  </Card>
+  <Card title="VS Code Copilot" icon="code">
+    Place `.mcp.json` in the project root. VS Code Copilot discovers it automatically and exposes GSD tools to GitHub Copilot Chat.
+  </Card>
+  <Card title="Cursor" icon="cursor">
+    Add GSD to Cursor's MCP settings to access GSD milestone and task management directly from the Cursor editor.
+  </Card>
+  <Card title="Any MCP-Compatible Client" icon="plug">
+    Any client that implements the MCP specification can connect. Use stdio transport for local tools, or HTTP transport for remote setups.
+  </Card>
+</CardGroup>
+
+## What Tools Are Exposed
+
+The MCP server exposes GSD's complete workflow tool surface, including:
+
+- Milestone planning, slice management, and task completion
+- Roadmap reassessment and requirement tracking
+- Journal queries and session history
+- Session management tools (`gsd_execute`, `gsd_status`, `gsd_result`, `gsd_cancel`) for starting and monitoring auto-mode sessions
+
+Run `/gsd mcp status` from inside a GSD session to verify the connection and list available tools.
+
+## Cloud MCP Gateway
+
+The Cloud MCP Gateway lets remote MCP clients call GSD workflow tools through a local runtime — useful when your AI client can't reach your workstation directly but your workstation can open an outbound connection.
+
+### How It Works
+
+1. A gateway process (`gsd-cloud-mcp-gateway`) runs on a publicly reachable server
+2. Your local GSD runtime connects to the gateway with a device token
+3. Remote MCP clients send tool calls to the gateway, which forwards them to your local runtime
+
+### Setting Up the Gateway
+
+On your gateway server:
+
+```bash
+export GSD_CLOUD_USER_TOKEN="your-long-random-token"
+gsd-cloud-mcp-gateway --port 8787
+```
+
+### Pairing a Local Runtime
+
+Generate a pairing code, then pair your local machine:
+
+```bash
+# On the gateway server — generate a pairing code
+curl -sS -X POST "https://your-gateway.example.com/pairing-codes" \
+  -H "Authorization: Bearer $GSD_CLOUD_USER_TOKEN"
+
+# On your local machine — pair with the code
+gsd-daemon cloud pair \
+  --gateway "https://your-gateway.example.com" \
+  --code "PAIRING_CODE" \
+  --runtime-name "My Laptop"
+```
+
+### Connecting to the Gateway
+
+Start the local runtime connection. It maintains a persistent WebSocket to the gateway and forwards tool calls to GSD:
+
+```bash
+gsd-daemon cloud connect --verbose
+```
+
+Check connection status at any time:
+
+```bash
+gsd-daemon cloud status
+```
+
+To disconnect and remove local credentials:
+
+```bash
+gsd-daemon cloud disconnect
+```
+
+### Connecting Remote MCP Clients
+
+Point any MCP client at the gateway MCP endpoint:
+
+```
+URL: https://your-gateway.example.com/mcp
+Authorization: Bearer <GSD_CLOUD_USER_TOKEN>
+```
+
+The gateway forwards calls to the connected local runtime. When multiple runtimes are connected, include `runtimeId` or `projectAlias` in the call to specify which runtime to target.
+
+<Warning>
+  Treat `GSD_CLOUD_USER_TOKEN` and device tokens like passwords. Never commit them to project files or share them in issue trackers.
+</Warning>
+
+## JSON-RPC Mode
+
+For programmatic integration that doesn't require full MCP protocol, GSD Pi also supports a JSON-RPC interface over stdin/stdout:
+
+```bash
+gsd --mode rpc
+```
+
+This is lower-level than MCP and is primarily used by GSD's own headless mode and the VS Code extension bridge. Use `--mode mcp` for standard MCP client integration.
+
+## Managing MCP Connections
+
+Inspect and manage MCP server connections from inside a GSD session:
+
+| Command | Description |
+|---------|-------------|
+| `/gsd mcp status` | Show configured servers and connection state |
+| `/gsd mcp check` | Verify servers are reachable |
+| `/gsd mcp discover` | List tools available from each server |
+| `/gsd mcp test` | Send a test call to verify a server |
+| `/gsd mcp enable <name>` | Enable a disabled server |
+| `/gsd mcp disable <name>` | Disable a server without removing config |
+| `/gsd mcp import` | Import server config from a file |
+| `/gsd mcp delete <name>` | Remove a server from config |
+| `/gsd mcp init` | Auto-write `.mcp.json` for Claude Code integration |

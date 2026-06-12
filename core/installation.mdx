@@ -1,0 +1,184 @@
+---
+title: "Install GSD Core into Any AI Coding Runtime in Minutes"
+sidebarTitle: "Installation"
+description: "Install GSD Core with a single npx command. The interactive installer configures your chosen runtime, scope, and hooks in under two minutes."
+---
+
+GSD Core installs as a set of commands, agents, workflows, and hooks into the configuration directory of your AI coding runtime. The installer handles all runtime-specific adaptation automatically — you answer a few questions, and it writes the correct files to the correct paths.
+
+## Requirements
+
+Before you begin, confirm your environment meets these prerequisites:
+
+- **Node.js** ≥ 22.0.0
+- **npm** ≥ 10.0.0
+
+Check your versions with:
+
+```bash
+node --version
+npm --version
+```
+
+<Tip>
+  If you need to manage multiple Node.js versions, use [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm). GSD Core requires Node.js 22 for its native fetch support and ESM compatibility.
+</Tip>
+
+## Run the installer
+
+Run the installer with a single command:
+
+```bash
+npx @opengsd/gsd-core@latest
+```
+
+The installer is interactive and will guide you through the setup. Do not copy files from `agents/` or `commands/` directly — the installer applies runtime-specific transformations that are required for each target environment.
+
+## Interactive installer walkthrough
+
+<Steps>
+  <Step title="Select your runtime">
+    The installer prompts you to choose which AI coding runtime to target. Select the one you use — for example, Claude Code, Gemini CLI, Codex, or Cursor.
+
+    If you use multiple runtimes, run the installer once per runtime, or pass `--all` to install for every supported runtime at once.
+  </Step>
+
+  <Step title="Choose installation scope">
+    Choose between a **global** install (affects all projects on your machine) or a **local** install (affects only the current project directory).
+
+    - **Global** is recommended for most users. Commands and agents are available in every project.
+    - **Local** is useful when you need project-specific GSD configurations or want to keep GSD isolated to one repository.
+  </Step>
+
+  <Step title="Review what will be installed">
+    The installer lists the files it will write — commands, agents, workflows, references, templates, and hooks — along with their destination paths. Review the list and confirm to proceed.
+  </Step>
+
+  <Step title="Hooks and permissions registered">
+    For most runtimes, the installer registers GSD's runtime hooks automatically:
+
+    - **Status line hook** — displays model, task, directory, and context usage bar
+    - **Context monitor hook** — injects agent-facing warnings when context runs low
+    - **Prompt guard hook** — scans `.planning/` writes for injection patterns
+
+    For Claude Code, the installer also pre-populates `settings.json` with the permissions GSD needs, eliminating first-run approval prompts.
+  </Step>
+</Steps>
+
+## Command prefixes by runtime
+
+GSD Core ships the same commands to every runtime, but the invocation syntax differs. Use the correct prefix for your runtime:
+
+<Tabs>
+  <Tab title="Claude Code / Copilot / OpenCode / Kilo">
+    Commands use the **hyphen form**:
+
+    ```text
+    /gsd-command-name
+    ```
+
+    **Examples:**
+
+    ```text
+    /gsd-new-project
+    /gsd-plan-phase 1
+    /gsd-execute-phase 1
+    ```
+  </Tab>
+
+  <Tab title="Gemini CLI">
+    Commands use the **colon form** — Gemini namespaces all plugin commands under the plugin ID:
+
+    ```text
+    /gsd:command-name
+    ```
+
+    **Examples:**
+
+    ```text
+    /gsd:new-project
+    /gsd:plan-phase 1
+    /gsd:execute-phase 1
+    ```
+
+    The installer rewrites all body-text references to the colon form automatically during a `--gemini` install. When following walkthroughs written for Claude Code, replace every `/gsd-` prefix with `/gsd:`.
+  </Tab>
+
+  <Tab title="Codex">
+    Commands use the **dollar-prefix skill form**:
+
+    ```text
+    $gsd-command-name
+    ```
+
+    **Examples:**
+
+    ```text
+    $gsd-new-project
+    $gsd-plan-phase 1
+    $gsd-execute-phase 1
+    ```
+
+    <Note>
+      Codex CLI version **≥ 0.130.0** is required for full GSD Core compatibility. Run `codex --version` to check.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Runtime-specific install flags
+
+If you prefer to skip the interactive prompts, pass runtime and scope flags directly:
+
+```bash
+# Claude Code, global
+npx @opengsd/gsd-core@latest --claude --global
+
+# Gemini CLI, global
+npx @opengsd/gsd-core@latest --gemini --global
+
+# Codex, local
+npx @opengsd/gsd-core@latest --codex --local
+
+# Cursor, global
+npx @opengsd/gsd-core@latest --cursor --global
+
+# Cline, global
+npx @opengsd/gsd-core@latest --cline --global
+
+# All supported runtimes, global
+npx @opengsd/gsd-core@latest --all --global
+```
+
+## Verify the installation
+
+After the installer completes, open your runtime and run:
+
+```text
+/gsd-new-project
+```
+
+If the command is recognized and begins asking you questions about your project, the installation succeeded.
+
+<Note>
+  For Gemini CLI users, run `/gsd:new-project` instead.
+</Note>
+
+## Start your first project
+
+Once GSD Core is installed, run `/gsd-new-project` to begin. The command walks you through an interactive session to define your project, runs parallel research agents to understand your domain, generates a `REQUIREMENTS.md` and `ROADMAP.md`, and leaves you ready to start the phase loop.
+
+See the [Quickstart](/core/quickstart) guide for a complete walkthrough of your first project from install to shipped phase.
+
+## Updating GSD Core
+
+To update to the latest stable release, run the same install command again — the installer is idempotent and backs up any locally modified files to `gsd-local-patches/` before overwriting:
+
+```bash
+npx @opengsd/gsd-core@latest
+```
+
+To install the release candidate channel instead, use your runtime's update command:
+
+```text
+/gsd-update --next
+```

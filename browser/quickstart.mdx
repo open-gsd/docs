@@ -1,0 +1,170 @@
+---
+title: "GSD Browser Quickstart: First Session in Minutes"
+sidebarTitle: "Quickstart"
+description: "Start the daemon, navigate to a page, take a snapshot to get versioned element refs, interact with them, and capture a screenshot in under five minutes."
+---
+
+This guide walks you through your first GSD Browser session. You will start the daemon, navigate to a page, take a snapshot to get versioned element refs, interact with those refs, and capture a screenshot. By the end, you will understand the core CLI workflow and know where to go next for AI agent integration.
+
+<Note>
+  Make sure you have [installed GSD Browser](/browser/installation) and that Chrome or Chromium is available on your machine before continuing.
+</Note>
+
+## CLI quickstart
+
+<Steps>
+  <Step title="Start the daemon">
+    The daemon starts automatically on the first browser command, but you can also pre-warm it explicitly:
+
+    ```bash
+    gsd-browser daemon start
+    ```
+
+    Verify it is running:
+
+    ```bash
+    gsd-browser daemon health
+    ```
+  </Step>
+
+  <Step title="Navigate to a URL">
+    Send the browser to any page. The daemon opens Chrome if it isn't already running.
+
+    ```bash
+    gsd-browser navigate https://example.com
+    ```
+
+    You can combine navigation with an instant screenshot:
+
+    ```bash
+    gsd-browser navigate https://example.com --screenshot
+    ```
+  </Step>
+
+  <Step title="Take a snapshot to get element refs">
+    A snapshot scans the current page and assigns stable versioned refs to every interactive element. Refs look like `@v1:e1`, `@v1:e2`, and so on. The version prefix ensures stale refs from a previous snapshot are automatically rejected.
+
+    ```bash
+    gsd-browser snapshot
+    ```
+
+    Example output:
+
+    ```
+    @v1:e1  [a]      "More information..." (href="/more")
+    @v1:e2  [input]  type="search" placeholder="Search..."
+    @v1:e3  [button] "Search"
+    ```
+
+    <Tip>
+      Always take a fresh snapshot after navigation or any DOM change. Old refs become stale when the page state changes. See [Snapshots & Refs](/browser/concepts/snapshots-refs) for a full explanation.
+    </Tip>
+  </Step>
+
+  <Step title="Click an element using its ref">
+    Pass a ref directly to `click`. GSD Browser resolves it to the live DOM element — no CSS selector guessing required.
+
+    ```bash
+    gsd-browser click @v1:e1
+    ```
+
+    You can also click by CSS selector when you prefer:
+
+    ```bash
+    gsd-browser click "#submit-btn"
+    ```
+  </Step>
+
+  <Step title="Type into a field">
+    Target an input by its ref and provide the text to type:
+
+    ```bash
+    gsd-browser type @v1:e2 "hello world"
+    ```
+
+    Add `--submit` to press Enter after typing, or `--clear-first` to empty the field before filling it:
+
+    ```bash
+    gsd-browser type @v1:e2 "hello world" --clear-first --submit
+    ```
+  </Step>
+
+  <Step title="Capture a screenshot">
+    Save the current viewport as an image. Both JPEG and PNG are supported.
+
+    ```bash
+    gsd-browser screenshot --output page.png --format png
+    ```
+
+    Capture the full scrollable page:
+
+    ```bash
+    gsd-browser screenshot --output full.png --format png --full-page
+    ```
+  </Step>
+
+  <Step title="Stop the daemon">
+    When you are done, stop the daemon and close the browser:
+
+    ```bash
+    gsd-browser daemon stop
+    ```
+  </Step>
+</Steps>
+
+## Useful CLI options
+
+Every `gsd-browser` command accepts these global flags:
+
+| Flag | Purpose |
+|---|---|
+| `--json` | Return structured JSON output instead of human-readable text |
+| `--session <name>` | Target a named session for isolated browser state |
+| `--browser-path <path>` | Path to a specific Chrome or Chromium binary |
+| `--cdp-url <url>` | Attach to an already-running Chrome instance |
+
+For example, to get JSON output from a snapshot:
+
+```bash
+gsd-browser snapshot --json
+```
+
+## AI agent path: MCP server
+
+If you are connecting an AI agent rather than scripting the CLI directly, use the MCP server instead. It exposes the full GSD Browser surface as 50+ discoverable tools, live resources, and executable prompts to any MCP-compatible client.
+
+Start the MCP server on stdio (most clients manage the process for you):
+
+```bash
+gsd-browser mcp
+```
+
+Or run it as an HTTP server for remote and cloud agents:
+
+```bash
+export GSD_BROWSER_MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+gsd-browser mcp --http --host 0.0.0.0 --port 8788
+```
+
+<CardGroup cols={2}>
+  <Card title="MCP Server guide" icon="plug" href="/browser/concepts/mcp-server">
+    Client configuration, tool categories, resources, prompts, and remote hosting.
+  </Card>
+  <Card title="Snapshots & Refs" icon="fingerprint" href="/browser/concepts/snapshots-refs">
+    Deep dive into versioned refs — the core mechanism for reliable agent interaction.
+  </Card>
+</CardGroup>
+
+## What to explore next
+
+<CardGroup cols={3}>
+  <Card title="Sessions" icon="layer-group" href="/browser/concepts/sessions">
+    Isolate browser state, run parallel agent tasks, and persist authentication across runs.
+  </Card>
+  <Card title="Snapshots & Refs" icon="fingerprint" href="/browser/concepts/snapshots-refs">
+    Understand versioned refs, snapshot modes, and the action cache.
+  </Card>
+  <Card title="MCP Server" icon="robot" href="/browser/concepts/mcp-server">
+    Connect Cursor, Claude Desktop, or any MCP-compatible agent.
+  </Card>
+</CardGroup>

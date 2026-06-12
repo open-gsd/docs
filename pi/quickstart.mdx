@@ -1,0 +1,155 @@
+---
+title: "GSD Pi Quickstart: First Autonomous Coding Session"
+sidebarTitle: "Quickstart"
+description: "Start your first GSD Pi session, create a project, run autonomous mode, and ship a pull request — step by step in under ten minutes."
+---
+
+This guide walks you through your first complete GSD Pi workflow: launching the TUI, describing a project, letting Pi plan and implement it autonomously, and creating a pull request when the work is done. By the end, you'll have run a full autonomous coding session and seen Pi's milestone → slice → task execution loop in action.
+
+## Before You Begin
+
+Make sure GSD Pi is installed and your LLM provider is configured. If you haven't done that yet, follow the [Installation guide](/pi/installation) first.
+
+```bash
+gsd --version   # confirm the CLI is available
+```
+
+## Full Autonomous Workflow
+
+<Steps>
+  <Step title="Start the TUI">
+    Navigate to your project directory and launch GSD Pi:
+
+    ```bash
+    cd path/to/your-project
+    gsd
+    ```
+
+    The terminal UI opens with a welcome screen. On the first run for a project, Pi creates the `.gsd/` directory to store plans, state, and knowledge.
+  </Step>
+
+  <Step title="Configure your provider (if needed)">
+    If you haven't set up an LLM provider yet, or want to change your current provider, run the configuration wizard from inside the session:
+
+    ```text
+    /gsd config
+    ```
+
+    The wizard lets you enter an API key, sign in via OAuth (GitHub Copilot), or point Pi at a local model (Ollama, LM Studio). You can re-run this any time to add a new provider or rotate credentials.
+
+    <Tip>
+      Already configured during install? Skip this step — Pi picks up your saved credentials automatically.
+    </Tip>
+  </Step>
+
+  <Step title="Create your project">
+    Tell Pi what you're building with the new-project command:
+
+    ```text
+    /gsd new-project
+    ```
+
+    Pi will ask you to describe the project in plain language. Be as specific or as high-level as you like — Pi will ask follow-up questions to clarify scope, constraints, and success criteria before writing any plans.
+
+    For a deeper up-front discovery flow that produces structured requirements and research artifacts before planning begins, add the `--deep` flag:
+
+    ```text
+    /gsd new-project --deep
+    ```
+
+    Once you approve the project scope, Pi writes the first milestone roadmap to `.gsd/`.
+  </Step>
+
+  <Step title="Start autonomous mode">
+    With a project and milestone defined, start autonomous execution:
+
+    ```text
+    /gsd auto
+    ```
+
+    Pi enters its execution loop: it plans each slice, implements every task in a fresh context window, verifies the work against your project's test and lint commands, commits with meaningful messages, and advances to the next unit automatically.
+
+    Watch the dashboard for real-time progress — it shows the current milestone, active slice and task, elapsed time, and running cost.
+
+    <Info>
+      Press **Escape** at any time to pause auto mode. The conversation is preserved and you can inspect state, ask questions, or steer the plan. Run `/gsd auto` again to resume.
+    </Info>
+  </Step>
+
+  <Step title="Watch Pi work">
+    While auto mode runs, Pi cycles through these phases for each slice:
+
+    1. **Plan** — scouts the codebase, researches relevant docs, decomposes the slice into tasks
+    2. **Execute** — implements each task in a fresh context window with full project context pre-loaded
+    3. **Complete** — writes summaries, generates a UAT script, commits all changes
+    4. **Reassess** — checks whether the roadmap still makes sense given what was learned
+    5. **Advance** — moves to the next slice or validates the milestone if all slices are done
+
+    You can check progress at any time without interrupting auto mode:
+
+    ```text
+    /gsd status
+    ```
+  </Step>
+
+  <Step title="Ship your work">
+    When Pi finishes the milestone, create a pull request from the completed work:
+
+    ```text
+    /gsd ship
+    ```
+
+    Pi assembles the milestone artifacts, creates a PR branch, and opens the pull request for review. You get a clean, reviewable diff with a structured description generated from the milestone summaries and task history.
+
+    <Note>
+      `/gsd ship` requires the `gh` CLI to be installed and authenticated. If you prefer to create the PR manually, use `/gsd pr-branch` to prepare a clean branch without `.gsd/` commits.
+    </Note>
+  </Step>
+</Steps>
+
+## Quick Single-Task Mode
+
+For a small change that doesn't need full milestone planning, use Pi's single-shot print mode:
+
+```bash
+gsd --print "implement a hello world API endpoint in Express"
+```
+
+This runs a single focused coding session and exits — no TUI, no planning overhead, just a targeted implementation. Useful for quick fixes, one-off scripts, or exploring how Pi handles a specific task.
+
+You can also run a quick task from inside a session:
+
+```text
+/gsd quick "add input validation to the signup form"
+```
+
+## Useful Commands During a Session
+
+Once you're inside a GSD session, these commands help you navigate and control the workflow:
+
+| Command | What it does |
+|---------|-------------|
+| `/gsd auto` | Start or resume autonomous mode |
+| `/gsd next` | Execute one unit of work and pause |
+| `/gsd stop` | Gracefully stop auto mode |
+| `/gsd status` | Open the workflow visualizer |
+| `/gsd capture "idea"` | Record a thought for later triage without interrupting auto mode |
+| `/gsd ship` | Create a pull request from the current milestone |
+| `/gsd help` | Browse all available commands |
+
+## What to Expect
+
+<CardGroup cols={2}>
+  <Card title="First run takes a moment" icon="clock">
+    Pi reads your codebase and builds an initial understanding before planning. This one-time scan produces `.gsd/CODEBASE.md` and primes the project memory.
+  </Card>
+  <Card title="Plans are visible and editable" icon="file-pen">
+    All plans live as markdown files in `.gsd/`. You can read, edit, and steer them at any point — Pi picks up changes at the next phase boundary.
+  </Card>
+  <Card title="Auto mode is interruptible" icon="circle-pause">
+    Press Escape to pause, interact with Pi, then resume. Nothing is lost — state is persisted in the local SQLite database.
+  </Card>
+  <Card title="Verification runs your own commands" icon="circle-check">
+    Configure `verification_commands` in `.gsd/PREFERENCES.md` and Pi runs your lint and test suite after every task, retrying automatically on failure.
+  </Card>
+</CardGroup>

@@ -1,0 +1,335 @@
+---
+title: "GSD Core Quality Commands: Review, Debug, and Security"
+sidebarTitle: "Quality"
+description: "Reference for GSD Core quality and debugging commands — code review, testing, security, UI audits, debugging sessions, and cross-AI peer review."
+---
+
+The quality commands give you structured tools for reviewing, hardening, and debugging your work. They operate independently of the main phase pipeline so you can run them at any point — immediately after execution, as a retroactive audit, or in response to a reported bug. Each command targets a distinct quality concern: code correctness, test coverage, security posture, visual design, or debugging a live issue.
+
+---
+
+## `/gsd-code-review N`
+
+Review phase changes for bugs, security issues, and code quality problems.
+
+**Syntax**
+
+```bash
+/gsd-code-review 3
+/gsd-code-review 3 --depth=deep
+/gsd-code-review 3 --fix
+/gsd-code-review 3 --fix --auto
+/gsd-code-review 3 --files src/auth.ts,src/session.ts
+```
+
+**What it does**
+
+Spawns a `gsd-code-reviewer` agent to analyze source files changed during the specified phase. Produces a `REVIEW.md` artifact in the phase directory with severity-classified findings. With `--fix`, spawns a `gsd-code-fixer` agent to apply the found issues. All three depth levels use the phase's `SUMMARY.md` and git diff to scope the file set.
+
+**Produces**
+
+`{padded_phase}-REVIEW.md` — findings classified as Critical, Warning, or Info, with file references and remediation suggestions.
+
+**Flags**
+
+<ParamField query="--depth" type="string">
+  Review depth. Accepted values:
+  - `quick` — Pattern-matching only (~2 min)
+  - `standard` — Per-file analysis with language-specific checks (~5–15 min, default)
+  - `deep` — Cross-file analysis including import graphs and call chains (~15–30 min)
+</ParamField>
+
+<ParamField query="--files" type="string">
+  Comma-separated explicit file list. Bypasses `SUMMARY.md` extraction and git diff scoping entirely. Highest precedence for file selection. Example: `--files src/api.ts,src/middleware.ts`.
+</ParamField>
+
+<ParamField query="--fix" type="flag">
+  After review completes (or if `REVIEW.md` already exists), auto-apply fixes. Spawns a `gsd-code-fixer` agent. Combines with the sub-flags below.
+</ParamField>
+
+<ParamField query="--fix --all" type="flag">
+  Expand the fix scope to include Info-level findings in addition to the default Critical + Warning.
+</ParamField>
+
+<ParamField query="--fix --auto" type="flag">
+  Enable a fix → re-review iteration loop, capped at 3 cycles, until no Critical or Warning findings remain.
+</ParamField>
+
+---
+
+## `/gsd-audit-fix`
+
+Autonomous audit-to-fix pipeline: find issues, classify, fix, test, commit.
+
+**Syntax**
+
+```bash
+/gsd-audit-fix --source audit-uat
+/gsd-audit-fix --source audit-uat --severity high
+/gsd-audit-fix --source audit-uat --max 10
+/gsd-audit-fix --source audit-uat --dry-run
+```
+
+**What it does**
+
+Runs a specified audit, classifies each finding as auto-fixable or manual-only, then autonomously fixes the auto-fixable subset with test verification and atomic commits per fix. Use this when you have a set of audit findings you want resolved without manual intervention for each one.
+
+**Flags**
+
+<ParamField query="--source" type="string" required>
+  Which audit to run. Default: `audit-uat`. Pass the audit type name as the value.
+</ParamField>
+
+<ParamField query="--severity" type="string">
+  Minimum severity to process. Accepted values: `high`, `medium`, `all`. Default: `medium`.
+</ParamField>
+
+<ParamField query="--max N" type="number">
+  Maximum number of findings to fix in a single run. Default: `5`.
+</ParamField>
+
+<ParamField query="--dry-run" type="flag">
+  Classify findings and show the classification table — auto-fixable vs manual-only — without applying any fixes.
+</ParamField>
+
+---
+
+## `/gsd-add-tests N`
+
+Generate unit and end-to-end tests for a completed phase.
+
+**Syntax**
+
+```bash
+/gsd-add-tests 4
+/gsd-add-tests 4 focus on edge cases in the pricing module
+```
+
+**What it does**
+
+Analyzes the implementation files from the specified phase using its `SUMMARY.md`, `CONTEXT.md`, and `VERIFICATION.md` as specifications. Classifies each file as TDD (unit tests), E2E (browser tests), or Skip, presents the test plan for your approval, then generates tests following RED-GREEN conventions. Any additional instructions you include after the phase number are passed through to the test generator.
+
+**Produces**
+
+Test files committed with message `test(phase-{N}): add unit and E2E tests from add-tests command`.
+
+---
+
+## `/gsd-secure-phase N`
+
+Retroactively verify threat mitigations for a completed phase.
+
+**Syntax**
+
+```bash
+/gsd-secure-phase 3
+/gsd-secure-phase
+```
+
+**What it does**
+
+Audits threat mitigations for a completed phase in one of three modes: if a `SECURITY.md` already exists it audits and verifies the mitigations; if only a `PLAN.md` with a threat model exists it runs the analysis from those artifacts; if the phase was never executed it exits with guidance. Omit the phase number to default to the last completed phase.
+
+**Produces**
+
+Updated `{phase_num}-SECURITY.md` — threat list with mitigation status and any remaining gaps.
+
+---
+
+## `/gsd-ui-review N`
+
+Six-pillar visual frontend audit of implemented code.
+
+**Syntax**
+
+```bash
+/gsd-ui-review 5
+/gsd-ui-review
+```
+
+**What it does**
+
+Conducts a retroactive six-pillar visual audit of the frontend code implemented in the specified phase. Each pillar is graded 1–4. Works on any project regardless of framework. Omit the phase number to default to the last completed phase.
+
+**Produces**
+
+`{phase_num}-UI-REVIEW.md` — graded assessment across the six pillars with specific improvement recommendations per finding.
+
+---
+
+## `/gsd-validate-phase N`
+
+Retroactive Nyquist test coverage audit for a completed phase.
+
+**Syntax**
+
+```bash
+/gsd-validate-phase 2
+/gsd-validate-phase
+```
+
+**What it does**
+
+Audits Nyquist validation coverage for a completed phase. If a `VALIDATION.md` already exists it audits and fills any gaps. If no `VALIDATION.md` exists but a `SUMMARY.md` does it reconstructs the validation state from available artifacts. Omit the phase number to default to the last completed phase.
+
+**Produces**
+
+Updated `VALIDATION.md` and generated test files covering any previously unvalidated paths.
+
+---
+
+## `/gsd-debug [description]`
+
+Systematic debugging with persistent state across context resets.
+
+**Syntax**
+
+```bash
+/gsd-debug "login fails with 401 after token refresh"
+/gsd-debug --diagnose "memory leak in the image processor"
+/gsd-debug list
+/gsd-debug status auth-401-fix
+/gsd-debug continue auth-401-fix
+```
+
+**What it does**
+
+Applies the scientific method to debugging. The orchestrator gathers symptoms, spawns a `gsd-debugger` agent for isolated investigation, handles checkpoints to persist state across context resets, and spawns continuation agents when needed. Subcommands let you list active sessions, check the status of a specific session by slug, or continue an interrupted session.
+
+**Flags**
+
+<ParamField query="--diagnose" type="flag">
+  Diagnose only. Returns a Root Cause Report with findings but does not apply a fix.
+</ParamField>
+
+**Subcommands**
+
+<ParamField query="list" type="string">
+  List all active (unresolved) debug sessions.
+</ParamField>
+
+<ParamField query="status [slug]" type="string">
+  Show the current status of a specific debug session identified by its slug.
+</ParamField>
+
+<ParamField query="continue [slug]" type="string">
+  Resume an interrupted debug session by slug, restoring all prior investigation context.
+</ParamField>
+
+---
+
+## `/gsd-forensics [description]`
+
+Post-mortem investigation for failed or stuck GSD workflows.
+
+**Syntax**
+
+```bash
+/gsd-forensics "plan-phase got stuck on phase 4"
+/gsd-forensics
+```
+
+**What it does**
+
+Investigates what went wrong during a GSD workflow execution. Reads git history, `.planning/` artifacts, and filesystem state to detect anomalies — stuck loops, missing artifacts, abandoned work, crash/interruption patterns — and generates a structured forensic report. Read-only investigation only: it never modifies your project source files. Omit the description to be prompted interactively.
+
+**Produces**
+
+`.planning/forensics/report-{timestamp}.md` — evidence-based findings, anomaly list, root cause analysis, and recommended corrective actions.
+
+---
+
+## `/gsd-eval-review N`
+
+Audit AI phase evaluation coverage.
+
+**Syntax**
+
+```bash
+/gsd-eval-review 6
+/gsd-eval-review
+```
+
+**What it does**
+
+Conducts a retroactive evaluation coverage audit of a completed AI phase. Checks whether the evaluation strategy defined in `AI-SPEC.md` was actually implemented in the phase's output. Produces a scored verdict with a list of gaps and a remediation plan. Omit the phase number to default to the last completed phase.
+
+**Produces**
+
+`{phase_num}-EVAL-REVIEW.md` — coverage score, verdict (pass/fail), gap list, and remediation steps.
+
+---
+
+## `/gsd-review --phase N`
+
+Cross-AI peer review of phase plans from external AI CLIs.
+
+**Syntax**
+
+```bash
+/gsd-review --phase 3
+/gsd-review --phase 3 --gemini --codex
+/gsd-review --phase 3 --all
+```
+
+**What it does**
+
+Invokes one or more external AI CLIs to independently review the plan files for the specified phase. Collects all responses and writes a structured `REVIEWS.md` that you can feed back into planning via `/gsd-plan-phase --reviews`. Detects which CLIs are installed and available before dispatching.
+
+**Produces**
+
+`{phase_num}-REVIEWS.md` — per-reviewer feedback with severity classification (HIGH / MEDIUM / LOW) for each concern.
+
+**Flags**
+
+<ParamField query="--phase N" type="number" required>
+  The phase whose plans you want reviewed.
+</ParamField>
+
+<ParamField query="--gemini" type="flag">
+  Include Gemini CLI as a reviewer.
+</ParamField>
+
+<ParamField query="--claude" type="flag">
+  Include a separate Claude CLI session as a reviewer.
+</ParamField>
+
+<ParamField query="--codex" type="flag">
+  Include Codex CLI as a reviewer.
+</ParamField>
+
+<ParamField query="--opencode" type="flag">
+  Include OpenCode as a reviewer (uses the model from your OpenCode config).
+</ParamField>
+
+<ParamField query="--qwen" type="flag">
+  Include Qwen Code (Alibaba Qwen models) as a reviewer.
+</ParamField>
+
+<ParamField query="--cursor" type="flag">
+  Include Cursor agent as a reviewer.
+</ParamField>
+
+<ParamField query="--agy" type="flag">
+  Include Antigravity CLI as a reviewer. Also accepted as `--antigravity`.
+</ParamField>
+
+<ParamField query="--coderabbit" type="flag">
+  Include CodeRabbit as a reviewer.
+</ParamField>
+
+<ParamField query="--ollama" type="flag">
+  Include a local Ollama server as a reviewer.
+</ParamField>
+
+<ParamField query="--lm-studio" type="flag">
+  Include a local LM Studio server as a reviewer.
+</ParamField>
+
+<ParamField query="--llama-cpp" type="flag">
+  Include a local llama.cpp server as a reviewer.
+</ParamField>
+
+<ParamField query="--all" type="flag">
+  Include every available CLI and running local model server as reviewers.
+</ParamField>

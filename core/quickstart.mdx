@@ -1,0 +1,173 @@
+---
+title: "GSD Core Quickstart: From Install to Shipped Phase"
+sidebarTitle: "Quickstart"
+description: "Walk through a complete GSD Core project cycle — initialize, discuss, plan, execute, verify, and ship your first phase in one session."
+---
+
+This guide walks you through your first complete GSD Core project cycle. By the end, you will have initialized a project, run the full five-step phase loop, and created a pull request for your first shipped phase. Each step takes two to five minutes; the full cycle typically runs in under an hour for a well-scoped phase.
+
+<Note>
+  The commands below use the Claude Code / Copilot / OpenCode / Kilo hyphen form (`/gsd-command-name`). If you are on Gemini CLI, replace `/gsd-` with `/gsd:`. If you are on Codex, replace `/gsd-` with `$gsd-`.
+</Note>
+
+<Steps>
+  <Step title="Install GSD Core">
+    If you have not already installed GSD Core, run the installer now:
+
+    ```bash
+    npx @opengsd/gsd-core@latest
+    ```
+
+    The installer prompts for your runtime and installation scope. For full details, see the [Installation](/core/installation) guide.
+
+    After the installer completes, open your AI coding runtime in your project directory.
+  </Step>
+
+  <Step title="Initialize your project">
+    Run the new-project command to set up your project's planning artifacts:
+
+    ```text
+    /gsd-new-project
+    ```
+
+    GSD Core guides you through an interactive session to capture your project vision, constraints, and scope. It then spawns four parallel research agents to explore your domain — one each for stack, features, architecture, and common pitfalls.
+
+    **What gets created:**
+
+    | File | Purpose |
+    |------|---------|
+    | `.planning/PROJECT.md` | Project vision, constraints, and evolution rules |
+    | `.planning/REQUIREMENTS.md` | Scoped v1/v2 requirements with IDs |
+    | `.planning/ROADMAP.md` | Phase breakdown with status tracking |
+    | `.planning/STATE.md` | Living session memory — decisions, blockers, position |
+    | `.planning/config.json` | Workflow configuration |
+    | `.planning/research/` | Domain research from the parallel researchers |
+
+    Review the generated `ROADMAP.md` and approve it when prompted. GSD Core will not proceed until you confirm the roadmap reflects what you intend to build.
+
+    <Tip>
+      After `/gsd-new-project` completes, run `/clear` (or your runtime's equivalent) to start the phase loop with a fresh context window. GSD Core is designed around fresh contexts — all important state lives in `.planning/`, not in conversation history.
+    </Tip>
+  </Step>
+
+  <Step title="Discuss Phase 1">
+    Lock in your implementation preferences before planning begins:
+
+    ```text
+    /gsd-discuss-phase 1
+    ```
+
+    GSD Core reads your `ROADMAP.md` and asks targeted questions about the implementation choices for Phase 1 — library preferences, design patterns, testing approach, and any gray areas where there are multiple valid options. Your answers are written to `.planning/phases/01-*/CONTEXT.md`.
+
+    **Why this matters:** most plan quality issues happen because the AI makes assumptions that a discussion would have prevented. Running discuss-phase before plan-phase ensures the planner has your explicit preferences, not inferred ones.
+
+    Answer each question, then move on when the discussion is complete.
+  </Step>
+
+  <Step title="Plan Phase 1">
+    Run the planner to research, decompose, and verify the work:
+
+    ```text
+    /gsd-plan-phase 1
+    ```
+
+    GSD Core spawns four parallel phase researchers (stack, features, architecture, pitfalls), synthesizes their findings into `RESEARCH.md`, then passes everything to the planner. The planner creates two to three atomic execution plans, each sized to fit in a single fresh context window.
+
+    A plan-checker agent then reviews the plans across eight dimensions — requirement coverage, task atomicity, dependency ordering, context fit, and more. If the plans fail the check, the planner revises them automatically (up to three iterations) before surfacing the result to you.
+
+    **What gets created:**
+
+    ```text
+    .planning/phases/01-phase-name/
+      01-CONTEXT.md       ← your preferences from discuss-phase
+      01-RESEARCH.md      ← synthesized ecosystem research
+      01-01-PLAN.md       ← first atomic execution plan
+      01-02-PLAN.md       ← second atomic execution plan (if needed)
+    ```
+
+    Review the plans when prompted and approve them to proceed.
+  </Step>
+
+  <Step title="Execute Phase 1">
+    Run the executor to implement the plans:
+
+    ```text
+    /gsd-execute-phase 1
+    ```
+
+    GSD Core analyzes the plan dependencies, groups plans into waves, and spawns parallel executor subagents — each with a fresh context window of up to 200K tokens. Each executor reads only its assigned plan, makes an atomic git commit per completed task, and writes a `SUMMARY.md` documenting what it built and any deviations from the plan.
+
+    After all executors complete, a verifier agent runs a goal-backward check: it walks through what was built, runs your test suite, and writes `VERIFICATION.md` with a PASS or FAIL verdict and specific evidence.
+
+    <Note>
+      Subagents run in a separate context window — their work is invisible to the main session while in progress. Do not interrupt the session. Research and planning agents routinely take one to five minutes to complete.
+    </Note>
+  </Step>
+
+  <Step title="Verify Phase 1">
+    Run user acceptance testing on what was built:
+
+    ```text
+    /gsd-verify-work 1
+    ```
+
+    GSD Core reads `VERIFICATION.md` and walks you through a structured UAT session. You test the implemented features against the phase goals, document your findings, and mark the phase as verified or flag issues for a fix cycle.
+
+    **What gets created:**
+
+    ```text
+    .planning/phases/01-phase-name/
+      01-VERIFICATION.md  ← automated verification results
+      01-UAT.md           ← your acceptance test results
+    ```
+
+    If verification reveals problems, GSD Core generates a targeted fix plan. Run `/gsd-debug "description"` for a guided debugging session, or re-run `/gsd-execute-phase 1` after adjusting the plan.
+  </Step>
+
+  <Step title="Ship Phase 1">
+    Create a pull request for the verified work:
+
+    ```text
+    /gsd-ship 1
+    ```
+
+    GSD Core reads the phase artifacts — plans, summaries, and verification results — and generates a structured pull request body with sections for what changed, why, and how it was verified. It then archives the phase state and advances `STATE.md` to the next phase.
+
+    Your first phase is shipped. Run `/clear` and start the loop again with `/gsd-discuss-phase 2` for the next phase.
+
+    <Tip>
+      Run `/gsd-progress` at any time to see exactly where you are in the project lifecycle and what the next recommended step is. If you need to pause and resume later, run `/gsd-resume-work` at the start of your next session to restore full context from `.planning/continue-here.md`.
+    </Tip>
+  </Step>
+</Steps>
+
+## Full command reference
+
+The table below summarizes the commands you used and their key flags:
+
+| Command | Purpose | Key flags |
+|---------|---------|-----------|
+| `/gsd-new-project` | Initialize project artifacts and roadmap | `--auto @file.md` to ingest from a PRD |
+| `/gsd-discuss-phase N` | Capture implementation preferences | `--chain` to auto-advance to planning |
+| `/gsd-plan-phase N` | Research, plan, and verify | `--skip-research` when domain is familiar |
+| `/gsd-execute-phase N` | Run plans in parallel waves | — |
+| `/gsd-verify-work N` | Run user acceptance testing | — |
+| `/gsd-ship N` | Create PR and archive phase | `--draft` for a draft PR |
+| `/gsd-progress` | Show current position and next step | `--next` to auto-detect and run next step |
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Concepts" icon="arrow-right-arrow-left" href="/core/concepts/workflow">
+    Understand the five-step phase loop and how spec-driven development structures your work.
+  </Card>
+  <Card title="Planning Artifacts" icon="file-text" href="/core/concepts/planning-artifacts">
+    Learn what each file in `.planning/` contains and how artifacts feed into each other.
+  </Card>
+  <Card title="Agents" icon="robot" href="/core/concepts/agents">
+    Explore the specialist subagent system and understand what each agent does.
+  </Card>
+  <Card title="Context Management" icon="memory" href="/core/concepts/context-management">
+    Learn how GSD Core prevents context rot and maintains state across sessions.
+  </Card>
+</CardGroup>

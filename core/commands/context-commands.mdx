@@ -1,0 +1,285 @@
+---
+title: "GSD Core Context Commands: Mapping and Intelligence"
+sidebarTitle: "Context"
+description: "Reference for GSD Core codebase intelligence commands — mapping, knowledge graphs, learning extraction, doc ingestion, and ideation tools."
+---
+
+The context commands build and query the shared intelligence layer that informs GSD's planning and execution agents. Use them to map an unfamiliar codebase, maintain a live knowledge graph, harvest reusable patterns from completed phases, import existing documentation into `.planning/`, and explore ideas before committing to a plan. Most of these commands can run before or after project initialization.
+
+---
+
+## `/gsd-map-codebase`
+
+Analyze a codebase with parallel mapper agents to produce structured reference documents.
+
+**Syntax**
+
+```bash
+/gsd-map-codebase
+/gsd-map-codebase --fast
+/gsd-map-codebase --fast --focus arch
+/gsd-map-codebase --query "authentication"
+/gsd-map-codebase --query status
+/gsd-map-codebase --query diff
+/gsd-map-codebase --query refresh
+```
+
+**What it does**
+
+In full mode, spawns four parallel `gsd-codebase-mapper` agents — one per focus area — that each write their output documents directly to `.planning/codebase/`. The orchestrator only collects confirmations, keeping context usage minimal. In fast mode a single agent handles a chosen focus area. In query mode the command interrogates the live codebase intelligence index without spawning any mapper agents.
+
+**Produces** (full mode)
+
+| Document | Focus |
+|---|---|
+| `.planning/codebase/STACK.md` | Technology stack |
+| `.planning/codebase/INTEGRATIONS.md` | External integrations |
+| `.planning/codebase/ARCHITECTURE.md` | System architecture |
+| `.planning/codebase/STRUCTURE.md` | Directory and module structure |
+| `.planning/codebase/CONVENTIONS.md` | Coding conventions |
+| `.planning/codebase/TESTING.md` | Test strategy and coverage |
+| `.planning/codebase/CONCERNS.md` | Quality concerns and tech debt |
+
+**When to use**
+
+- Run before `/gsd-new-project` on brownfield codebases to understand existing code first.
+- Run after significant refactoring to refresh the codebase map.
+- Skip on greenfield projects with no code yet, or on codebases with fewer than 5 files.
+
+**Flags**
+
+<ParamField query="--fast" type="flag">
+  Lightweight scan mode. Spawns one mapper agent instead of four. Faster and lower-context than the full map. Optionally combine with `--focus` to target a specific area.
+</ParamField>
+
+<ParamField query="--focus" type="string">
+  Focus area for `--fast` mode. Accepted values: `tech`, `arch`, `quality`, `concerns`, `tech+arch` (default when `--fast` is used alone).
+</ParamField>
+
+<ParamField query="--query [term]" type="string">
+  Codebase intelligence query mode. Requires `intel.enabled: true` in your config. Sub-commands:
+  - `query [term]` — search the index for a term
+  - `status` — show index freshness and statistics
+  - `diff` — show changes since the last map run
+  - `refresh` — spawn a refresh agent to rebuild the index
+</ParamField>
+
+---
+
+## `/gsd-graphify`
+
+Build, query, and inspect the project knowledge graph.
+
+**Syntax**
+
+```bash
+/gsd-graphify build
+/gsd-graphify query "authentication"
+/gsd-graphify status
+/gsd-graphify diff
+```
+
+**What it does**
+
+Manages a structured knowledge graph in `.planning/graphs/` that captures nodes (phases, files, decisions, patterns) and their relationships. Requires `graphify.enabled: true` in your config. All operations run inline — no subagents are spawned.
+
+**Subcommands**
+
+<ParamField query="build" type="string">
+  Build or rebuild the knowledge graph from the current project state. Runs `graphify update`, copies output artifacts to `.planning/graphs/`, and writes a diff snapshot. Typical builds complete in 15–60 seconds.
+</ParamField>
+
+<ParamField query="query [term]" type="string">
+  Search the graph for a term. Returns matched nodes grouped by type, with edge relationships and confidence tiers (EXTRACTED / INFERRED / AMBIGUOUS).
+</ParamField>
+
+<ParamField query="status" type="string">
+  Show graph freshness (STALE or FRESH), last build time, node count, edge count, and hyperedge count. Also reports source commit staleness when available.
+</ParamField>
+
+<ParamField query="diff" type="string">
+  Show node and edge changes since the previous build snapshot. Run `build` twice to generate a baseline before using `diff`.
+</ParamField>
+
+---
+
+## `/gsd-extract-learnings N`
+
+Extract reusable patterns, decisions, and lessons from a completed phase.
+
+**Syntax**
+
+```bash
+/gsd-extract-learnings 5
+/gsd-extract-learnings --all
+```
+
+**What it does**
+
+Reads the completed phase's `PLAN.md`, `SUMMARY.md`, `VERIFICATION.md`, `UAT.md`, and `STATE.md` artifacts and distills them into a structured `LEARNINGS.md` covering decisions made, lessons learned, patterns discovered, and surprises encountered. These learnings feed back into future discuss and plan sessions.
+
+**Produces**
+
+`{phase_num}-LEARNINGS.md` — structured learning capture for decisions, lessons, patterns, and surprises.
+
+**Flags**
+
+<ParamField query="--all" type="flag">
+  Extract learnings from all completed phases in the current milestone in one pass rather than targeting a single phase.
+</ParamField>
+
+---
+
+## `/gsd-ingest-docs`
+
+Bootstrap `.planning/` from existing ADRs, PRDs, SPECs, and docs.
+
+**Syntax**
+
+```bash
+/gsd-ingest-docs
+/gsd-ingest-docs docs/adr/ --mode new
+/gsd-ingest-docs --mode merge --manifest docs/ingest.yaml
+```
+
+**What it does**
+
+Builds the full `.planning/` setup — or merges into an existing one — from multiple pre-existing planning documents in a single pass. Discovers files by directory convention (`docs/adr/`, `docs/prd/`, `docs/specs/`, `docs/rfc/`) or via an explicit `--manifest` YAML file. Auto-synthesizes most conflicts using the precedence rule `ADR > SPEC > PRD > DOC`, surfaces unresolved conflicts in `INGEST-CONFLICTS.md`, and blocks destination writes when unresolved contradictions exist. Hard cap of 50 documents per invocation.
+
+**Produces**
+
+In `--mode new`: `PROJECT.md`, `REQUIREMENTS.md`, `ROADMAP.md`, `STATE.md`.  
+In `--mode merge`: appended phases and requirements derived from the ingested docs.  
+When conflicts exist: `.planning/INGEST-CONFLICTS.md` with three buckets — auto-resolved, competing-variants, unresolved-blockers.
+
+**Flags**
+
+<ParamField query="--mode" type="string">
+  Ingestion mode. Accepted values:
+  - `new` — bootstrap `.planning/` from scratch (default when `.planning/` is absent)
+  - `merge` — append to an existing `.planning/` setup (default when `.planning/` is present)
+</ParamField>
+
+<ParamField query="--manifest" type="string">
+  Path to a YAML file listing `{path, type, precedence?}` per document. Use when directory-convention discovery is insufficient or you need custom precedence overrides.
+</ParamField>
+
+---
+
+## `/gsd-docs-update`
+
+Generate or update project documentation verified against the codebase.
+
+**Syntax**
+
+```bash
+/gsd-docs-update
+/gsd-docs-update --force
+/gsd-docs-update --verify-only
+```
+
+**What it does**
+
+Generates and updates up to nine documentation files for the project. Each doc type is written by a `gsd-doc-writer` subagent that explores the codebase directly — no hallucinated paths, phantom endpoints, or stale signatures. Existing docs with GSD markers are preserved and updated; hand-written docs are preserved by default unless `--force` is set.
+
+**Flags**
+
+<ParamField query="--force" type="flag">
+  Skip preservation prompts and regenerate all docs regardless of existing content or GSD markers. Overwrites hand-written and GSD-managed docs alike.
+</ParamField>
+
+<ParamField query="--verify-only" type="flag">
+  Check existing docs for accuracy against the codebase without writing any files. Reports VERIFY marker count and discrepancies found.
+</ParamField>
+
+---
+
+## `/gsd-explore [topic]`
+
+Run a Socratic ideation session before committing to a plan.
+
+**Syntax**
+
+```bash
+/gsd-explore
+/gsd-explore "authentication strategy"
+/gsd-explore "should we use GraphQL or REST?"
+```
+
+**What it does**
+
+Opens an open-ended Socratic ideation session. Guides you through exploring an idea via probing questions, optionally spawns targeted research, and routes outputs to the appropriate GSD artifacts — notes, todos, seeds, research questions, requirements, or new phases. Use this when you want to think through an idea before formalizing it into a phase.
+
+---
+
+## `/gsd-spike [idea]`
+
+Run 2–5 focused feasibility experiments to validate an idea.
+
+**Syntax**
+
+```bash
+/gsd-spike "WebSocket real-time sync"
+/gsd-spike "Stripe subscription billing" --quick
+/gsd-spike --wrap-up
+/gsd-spike frontier
+```
+
+**What it does**
+
+Spikes an idea through experiential exploration — builds focused experiments to validate feasibility and produce verified knowledge for the real build. Each spike produces 2–5 experiments stored in `.planning/spikes/`. In frontier mode (no argument, or `frontier` as the argument) it analyzes your existing spike landscape and proposes integration and frontier spikes instead of building new ones. Does not require prior `/gsd-new-project` setup.
+
+**Produces**
+
+Experiment files in `.planning/spikes/` plus a `MANIFEST.md` tracking all spikes. With `--wrap-up`: a persistent project skill file capturing the spike findings.
+
+**Flags**
+
+<ParamField query="--quick" type="flag">
+  Skip decomposition and alignment questioning and jump straight to building. Use when you already know exactly what to spike.
+</ParamField>
+
+<ParamField query="--text" type="flag">
+  Use plain-text numbered lists instead of interactive menus. Required for non-Claude runtimes.
+</ParamField>
+
+<ParamField query="--wrap-up" type="flag">
+  Package spike findings into a persistent project skill for use in future build conversations. Runs the `spike-wrap-up` workflow.
+</ParamField>
+
+---
+
+## `/gsd-sketch [idea]`
+
+Generate throwaway HTML mockups to explore UI directions.
+
+**Syntax**
+
+```bash
+/gsd-sketch "dashboard layout"
+/gsd-sketch "onboarding flow" --quick
+/gsd-sketch --wrap-up
+/gsd-sketch frontier
+```
+
+**What it does**
+
+Explores design directions through throwaway HTML mockups before committing to implementation. Produces 2–3 variants per sketch for comparison. Mockups are stored in `.planning/sketches/`. Loads any existing spike findings to ground mockups in real data shapes and validated interaction patterns. In frontier mode it analyzes existing sketches and proposes consistency fixes and new frontier sketches. Does not require prior project setup.
+
+**Produces**
+
+Variant HTML files in `.planning/sketches/` plus a `MANIFEST.md`. With `--wrap-up`: a persistent project skill capturing the design findings.
+
+**Flags**
+
+<ParamField query="--quick" type="flag">
+  Skip mood and direction intake and jump straight to decomposition and building. Use when the design direction is already clear.
+</ParamField>
+
+<ParamField query="--text" type="flag">
+  Use plain-text numbered lists instead of interactive menus. Required for non-Claude runtimes.
+</ParamField>
+
+<ParamField query="--wrap-up" type="flag">
+  Package sketch design findings into a persistent project skill for use in future build conversations. Runs the `sketch-wrap-up` workflow.
+</ParamField>

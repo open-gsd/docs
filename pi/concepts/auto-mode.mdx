@@ -1,0 +1,219 @@
+---
+title: "GSD Pi Auto Mode: Autonomous Project Execution Loop"
+sidebarTitle: "Auto Mode"
+description: "Auto Mode runs GSD Pi through planning, implementation, verification, and milestone completion — with configurable budgets, timeouts, and controls."
+---
+
+Auto Mode is GSD Pi's autonomous execution engine. When you run `/gsd auto`, Pi takes the current project state, derives the next unit of work from the database, and runs the full development loop — planning, implementing, verifying, committing, and advancing — without you having to orchestrate each step. You can walk away and come back to built, committed, tested code with clean git history.
+
+## How the Loop Works
+
+Auto Mode operates as a state machine driven by the SQLite database at your project root. For each unit of work, Pi creates a fresh context window, injects a focused prompt with all relevant context pre-loaded (task plan, prior summaries, decisions register, roadmap excerpt), executes the work, persists the result, and dispatches the next unit.
+
+The loop flows through these phases for each slice:
+
+```
+Plan → Execute (per task) → Complete → Reassess Roadmap → Next Slice
+                                                               ↓ (all slices done)
+                                                       Validate Milestone → Complete Milestone
+```
+
+- **Plan** — Pi scouts the codebase, researches relevant documentation, and decomposes the slice into tasks with clear must-haves
+- **Execute** — Pi runs each task in its own fresh context window; no context bloat from previous tasks
+- **Complete** — Pi writes task summaries, generates a UAT script, marks the roadmap, and commits
+- **Reassess** — Pi checks whether the roadmap still makes sense given what was learned during execution
+- **Validate Milestone** — after all slices complete, Pi reconciles success criteria against actual results before sealing the milestone
+
+## Controlling Auto Mode
+
+### Start
+
+```text
+/gsd auto
+```
+
+Starts or resumes auto mode. Pi derives the latest state from the database and picks up where it left off.
+
+### Pause
+
+Press **Escape** to pause auto mode. The conversation is preserved and the current unit's state is saved. You can inspect the work, ask Pi questions, or read the planning files — then resume when ready.
+
+### Resume
+
+```text
+/gsd auto
+```
+
+Resuming is the same command as starting. Pi checks the database for an in-progress unit and continues from the current position.
+
+### Advance One Step
+
+```text
+/gsd next
+```
+
+Execute one unit of work and pause. Use this when you want to stay close to the work and review each step before Pi continues.
+
+### Stop
+
+```text
+/gsd stop
+```
+
+Gracefully stops auto mode after the current unit completes. You can run this from a separate terminal while auto mode is running in another.
+
+### Interrupt Immediately
+
+Press **Escape** during an active unit to interrupt Pi mid-execution. Pi saves whatever state it has written so far and pauses. Run `/gsd auto` to recover and continue.
+
+## Planning Depth
+
+By default, Pi uses `light` planning depth — a focused milestone discussion flow that writes context and roadmap artifacts immediately. For projects that benefit from more up-front discovery, enable `deep` planning mode:
+
+```yaml
+planning_depth: deep
+```
+
+You can also opt in when creating a project or milestone:
+
+```text
+/gsd new-project --deep
+/gsd new-milestone --deep
+```
+
+Deep mode runs a staged discovery flow before milestone planning:
+
+```
+Workflow Preferences → Project Context → Requirements →
+Research Decision → Optional Project Research → Milestone Context / Roadmap
+```
+
+This produces `PROJECT.md`, `REQUIREMENTS.md`, and optional research artifacts (`STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, `PITFALLS.md`) before any slice planning begins.
+
+## Budget Controls
+
+Configure a spending ceiling and enforcement policy in `.gsd/PREFERENCES.md`:
+
+```yaml
+budget_ceiling: 25.00
+budget_enforcement: pause
+```
+
+<Tabs>
+  <Tab title="warn">
+    Pi logs a warning when the ceiling is hit but continues running. Use this when you want visibility without hard stops.
+
+    ```yaml
+    budget_enforcement: warn
+    ```
+  </Tab>
+  <Tab title="pause">
+    Pi pauses auto mode when the ceiling is reached and waits for you to review and resume. This is the default when a `budget_ceiling` is set.
+
+    ```yaml
+    budget_enforcement: pause
+    ```
+  </Tab>
+  <Tab title="halt">
+    Pi stops auto mode entirely when the ceiling is hit. Use this for strict cost control in unattended runs.
+
+    ```yaml
+    budget_enforcement: halt
+    ```
+  </Tab>
+</Tabs>
+
+Check current spend at any time:
+
+```text
+/gsd status
+```
+
+The dashboard shows per-unit cost, running totals, and projections.
+
+## Timeout Supervision
+
+Three timeout tiers protect against runaway sessions:
+
+| Timeout | Setting | Default | Behavior |
+|---------|---------|---------|----------|
+| Soft | `soft_timeout_minutes` | 20 min | Sends Pi a wrap-up signal to finish durable output |
+| Idle | `idle_timeout_minutes` | 10 min | Detects stalls and intervenes |
+| Hard | `hard_timeout_minutes` | 30 min | Starts timeout recovery; pauses auto mode only if recovery cannot make progress |
+
+Configure them in `.gsd/PREFERENCES.md`:
+
+```yaml
+auto_supervisor:
+  soft_timeout_minutes: 20
+  idle_timeout_minutes: 10
+  hard_timeout_minutes: 30
+```
+
+The timeout system is designed to be recovery-aware. When a unit is actively writing durable progress during hard timeout recovery, Pi defers its final cancellation check to give the unit time to finalize before stopping.
+
+## Verification
+
+Pi can run your project's test and lint commands automatically after every task execution. Set them in `.gsd/PREFERENCES.md`:
+
+```yaml
+verification_commands:
+  - npm run lint
+  - npm run test
+verification_auto_fix: true
+verification_max_retries: 2
+```
+
+When verification fails, Pi sees the output and attempts to fix the issues before advancing to the next task. If Pi cannot fix the issues within the retry limit, auto mode pauses so you can intervene.
+
+<Note>
+  If you don't configure `verification_commands`, Pi attempts to discover your project's checks automatically — it looks for `package.json` scripts (typecheck, lint, test) for JavaScript projects and pytest markers for Python projects.
+</Note>
+
+## Crash Recovery
+
+Auto mode persists worker state, dispatch state, and session metadata in the database. If Pi crashes or your machine restarts, run `/gsd auto` again. Pi reconstructs the interrupted unit from the database, reads the surviving session file, synthesizes a recovery briefing from every tool call that completed, and resumes with full context.
+
+For unattended overnight runs, headless mode adds automatic crash recovery with exponential backoff:
+
+```bash
+gsd headless auto --max-restarts 3
+```
+
+## Key Behaviors
+
+<AccordionGroup>
+  <Accordion title="Fresh Context Per Unit">
+    Every task, planning step, and research phase runs in a clean context window. Pi pre-loads all necessary context (task plan, prior summaries, decisions register, codebase notes) into the dispatch prompt, so the agent starts fully oriented instead of spending tool calls reading files. This eliminates context bloat and keeps quality consistent across long autonomous runs.
+  </Accordion>
+  <Accordion title="Adaptive Replanning">
+    After each slice completes, Pi reassesses the roadmap. If the work revealed new information that changes the plan — a dependency that turned out to be more complex, a simpler approach that covers multiple planned slices — Pi reorders, adds, or removes future slices before continuing. You can skip reassessment with the `budget` token profile.
+  </Accordion>
+  <Accordion title="Stuck Loop Detection">
+    Pi uses a sliding-window analysis on recent dispatch history to detect stuck loops. On detection, it retries once with a deep diagnostic prompt. If the second attempt also fails, auto mode stops so you can intervene. Run `/gsd forensics` for a structured post-mortem.
+  </Accordion>
+  <Accordion title="Provider Error Recovery">
+    Pi automatically handles transient provider errors:
+    - Rate limits (429) → waits and retries after the retry-after header or 60 seconds
+    - Server errors (500, 502, 503) → retries after 30 seconds
+    - Permanent errors (invalid key, billing) → pauses and surfaces a clear message
+
+    No manual intervention needed for transient errors — Pi resumes automatically.
+  </Accordion>
+  <Accordion title="Meaningful Commit Messages">
+    Pi generates commit messages from task summaries — not generic "complete task" boilerplate. Each commit reflects what was actually built, giving you a `git log` that reads like a changelog.
+  </Accordion>
+  <Accordion title="Context Pressure Monitor">
+    When context usage reaches 70%, Pi sends itself a wrap-up signal, nudging it to finish durable output — commits, summaries, artifacts — before the context window fills. This prevents a session from hitting the hard context limit mid-task with nothing written to disk.
+  </Accordion>
+</AccordionGroup>
+
+## Post-Mortem Investigation
+
+If auto mode fails or behaves unexpectedly, run `/gsd forensics` for a full analysis:
+
+```text
+/gsd forensics
+```
+
+Forensics provides structured anomaly detection, recent unit traces, cost and token breakdowns, doctor integration, and an LLM-guided investigation session with full tool access to diagnose root causes.

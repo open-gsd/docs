@@ -1,0 +1,271 @@
+---
+title: "GSD Pi Preferences: Models, Budgets, and Notifications"
+sidebarTitle: "Preferences"
+description: "Set global and project-level preferences to control models, budgets, notifications, Git behavior, and custom instructions for every GSD Pi session."
+---
+
+GSD Pi preferences live in a YAML-frontmatter markdown file that you can edit directly or manage through the interactive wizard. Global preferences apply to all projects on your machine, while project-level preferences apply only to the current project and take priority over global values. This gives you a sensible baseline for all work with per-project overrides when needed.
+
+| Scope | Path | Applies to |
+|-------|------|-----------|
+| Global | `~/.gsd/PREFERENCES.md` | All projects on this machine |
+| Project | `.gsd/PREFERENCES.md` | Current project only |
+
+Open the interactive preferences wizard from inside a GSD session:
+
+```text
+/gsd prefs          # Open global preferences wizard
+/gsd prefs project  # Open project-level wizard
+/gsd prefs status   # Show current merged values and skill resolution
+```
+
+## Preferences File Format
+
+Preferences use YAML frontmatter in a markdown file. Everything between the `---` delimiters is parsed as YAML; any markdown below is ignored by GSD but useful for your own notes.
+
+```yaml
+---
+version: 1
+
+models:
+  execution: claude-sonnet-4-6
+  planning: claude-opus-4-6
+
+token_profile: balanced
+budget_ceiling: 25.00
+budget_enforcement: pause
+
+auto_supervisor:
+  soft_timeout_minutes: 20
+  hard_timeout_minutes: 30
+  idle_timeout_minutes: 10
+
+notifications:
+  enabled: true
+  on_milestone: true
+  on_attention: true
+
+custom_instructions:
+  - "Always use TypeScript strict mode"
+  - "Prefer functional patterns over classes"
+---
+```
+
+## Merge Behavior
+
+When both a global and a project preferences file exist, GSD merges them with these rules:
+
+- **Scalar fields** (e.g., `budget_ceiling`, `token_profile`): the project value wins if set
+- **Object fields** (e.g., `models`, `git`, `auto_supervisor`): shallow-merged, project overrides per-key
+- **Array fields** (e.g., `always_use_skills`, `custom_instructions`): concatenated, global first then project
+
+## Model Settings
+
+Control which LLM model GSD uses for each phase of the auto-mode pipeline.
+
+```yaml
+models:
+  research: claude-sonnet-4-6
+  planning: claude-opus-4-6
+  execution: claude-sonnet-4-6
+  execution_simple: claude-haiku-4-5-20250414
+  completion: claude-sonnet-4-6
+  subagent: claude-sonnet-4-6
+```
+
+| Phase | Description |
+|-------|-------------|
+| `research` | Milestone and slice research phases |
+| `planning` | Milestone and slice planning |
+| `execution` | Task execution (standard complexity) |
+| `execution_simple` | Task execution (simple tasks, routed by complexity) |
+| `completion` | Slice and milestone completion |
+| `subagent` | Delegated child-agent tasks |
+
+Use the `provider/model` format to target a specific provider (e.g., `bedrock/claude-sonnet-4-6`). Add a `fallbacks` list to continue automatically if a model is unavailable:
+
+```yaml
+models:
+  planning:
+    model: claude-opus-4-6
+    fallbacks:
+      - openrouter/z-ai/glm-5
+```
+
+### Token Profile
+
+`token_profile` coordinates model selection, phase skipping, and context compression in one setting:
+
+```yaml
+token_profile: balanced   # "budget", "balanced" (default), or "quality"
+```
+
+| Profile | Behavior |
+|---------|----------|
+| `budget` | Skips research and reassessment phases; uses cheaper models for eligible phases |
+| `balanced` | Default — all phases run with standard model selection |
+| `quality` | All phases run; prefers higher-quality models throughout |
+
+### Planning Depth
+
+Controls how much upfront discovery runs before milestone planning:
+
+```yaml
+planning_depth: deep   # "light" (default) or "deep"
+```
+
+Use `deep` for complex greenfield projects. Enable it for a specific project with `/gsd new-project --deep` rather than setting it globally.
+
+## Budget and Safety
+
+```yaml
+budget_ceiling: 25.00         # Maximum USD to spend in auto mode (no $ sign)
+budget_enforcement: pause     # "warn", "pause" (default), or "halt"
+context_pause_threshold: 80   # Pause at 80% context usage (0 = disabled)
+```
+
+| `budget_enforcement` value | Behavior |
+|---------------------------|----------|
+| `warn` | Log a warning and continue |
+| `pause` | Pause auto mode at the ceiling (default) |
+| `halt` | Stop auto mode entirely |
+
+### Auto-Mode Supervision Timeouts
+
+```yaml
+auto_supervisor:
+  soft_timeout_minutes: 20    # Warn the LLM to wrap up
+  idle_timeout_minutes: 10    # Detect stalls and intervene
+  hard_timeout_minutes: 30    # Pause auto mode if no progress
+```
+
+GSD sends a "wrap up" signal at the soft timeout, detects stalls at the idle timeout, and pauses the session at the hard timeout if recovery steering can't make durable progress.
+
+## Notifications
+
+```yaml
+notifications:
+  enabled: true
+  local_bell: false          # Play terminal bell on questions and auto-mode stops
+  on_complete: true          # Notify on unit completion
+  on_error: true             # Notify on errors
+  on_budget: true            # Notify on budget threshold crossings
+  on_milestone: true         # Notify when a milestone finishes
+  on_attention: true         # Notify when GSD needs your input
+```
+
+<Info>
+  On macOS, install `terminal-notifier` for reliable notification delivery: `brew install terminal-notifier`. Without it, GSD falls back to `osascript`, which may not have notification permissions in System Settings.
+</Info>
+
+## Custom Instructions
+
+Durable instructions that GSD appends to every session prompt. Use these for project-wide coding standards or conventions you want the agent to follow consistently.
+
+```yaml
+custom_instructions:
+  - "Always use TypeScript strict mode"
+  - "Write tests before implementation"
+  - "Prefer named exports over default exports"
+```
+
+<Tip>
+  For project-specific knowledge that evolves over time — architectural patterns, lessons learned, recurring pitfalls — use the GSD knowledge system (`/gsd knowledge rule`) instead of `custom_instructions`. Knowledge entries are memory-backed and selected contextually; `custom_instructions` appear in every prompt regardless of relevance.
+</Tip>
+
+## Skill Routing
+
+Control which skills GSD uses during auto mode. Skills are optional extensions that provide domain-specific behavior.
+
+```yaml
+always_use_skills:
+  - debug-like-expert         # Always inject this skill
+
+prefer_skills:
+  - frontend-design           # Prefer this skill when relevant
+
+avoid_skills:
+  - aggressive-refactor       # Never use this skill
+
+skill_rules:
+  - when: task involves authentication
+    use: [clerk]
+  - when: frontend styling work
+    prefer: [frontend-design]
+  - when: working with legacy code
+    avoid: [aggressive-refactor]
+```
+
+| Setting | Behavior |
+|---------|----------|
+| `always_use_skills` | Always included in every dispatch prompt |
+| `prefer_skills` | Included with a preference indicator |
+| `avoid_skills` | Never selected, even if relevant |
+| `skill_rules` | Conditional routing by task description |
+
+### Skill Discovery
+
+```yaml
+skill_discovery: suggest   # "auto", "suggest" (default), or "off"
+```
+
+| Value | Behavior |
+|-------|----------|
+| `auto` | Skills found and applied automatically |
+| `suggest` | Skills identified during research but not auto-installed |
+| `off` | Skill discovery disabled entirely |
+
+## Full Example
+
+```yaml
+---
+version: 1
+
+# Model selection
+models:
+  research: claude-sonnet-4-6
+  planning: claude-opus-4-6
+  execution: claude-sonnet-4-6
+  execution_simple: claude-haiku-4-5-20250414
+  completion: claude-sonnet-4-6
+  subagent: claude-sonnet-4-6
+
+# Token optimization
+token_profile: balanced
+planning_depth: light
+
+# Budget
+budget_ceiling: 25.00
+budget_enforcement: pause
+context_pause_threshold: 80
+
+# Supervision
+auto_supervisor:
+  soft_timeout_minutes: 20
+  idle_timeout_minutes: 10
+  hard_timeout_minutes: 30
+
+# Notifications
+notifications:
+  enabled: true
+  local_bell: false
+  on_complete: false
+  on_error: true
+  on_budget: true
+  on_milestone: true
+  on_attention: true
+
+# Custom instructions
+custom_instructions:
+  - "Always write TypeScript, never plain JavaScript"
+  - "Add JSDoc comments to all exported functions"
+
+# Skill routing
+skill_discovery: suggest
+always_use_skills:
+  - debug-like-expert
+skill_rules:
+  - when: task involves authentication
+    use: [clerk]
+---
+```

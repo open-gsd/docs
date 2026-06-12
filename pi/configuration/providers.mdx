@@ -1,0 +1,263 @@
+---
+title: "Connect LLM Providers to GSD Pi: Anthropic to Ollama"
+sidebarTitle: "Providers"
+description: "Connect Anthropic, OpenAI, Gemini, Ollama, and 10+ other LLM providers to GSD Pi — set API keys, list models, and switch providers per session."
+---
+
+GSD Pi supports a wide range of LLM providers. During first-run setup, the onboarding wizard walks you through provider configuration. At any point afterward, re-run the setup wizard to add or change providers.
+
+```bash
+gsd config
+```
+
+This opens an interactive wizard that shows which credentials are configured and which are missing. Select a provider to enter or update its credentials.
+
+## Supported Providers
+
+<Tabs>
+  <Tab title="Cloud APIs">
+    | Provider | Environment Variable | Notes |
+    |----------|---------------------|-------|
+    | Anthropic (Claude) | `ANTHROPIC_API_KEY` | Recommended. Deepest integration: built-in web search, extended thinking, prompt caching. Includes Claude Fable 5 (1M context, Opus-tier reasoning). |
+    | OpenAI | `OPENAI_API_KEY` | GPT-4o, o1, o3, and all current OpenAI models. |
+    | Google Gemini | `GEMINI_API_KEY` | Gemini 1.5 Pro, Flash, and Gemini 2.x models. |
+    | OpenRouter | `OPENROUTER_API_KEY` | 200+ models from multiple providers via a single key. |
+    | Groq | `GROQ_API_KEY` | High-throughput inference for Llama, Mixtral, and others. |
+    | xAI (Grok) | `XAI_API_KEY` | Grok-2 and Grok-3 models. |
+    | Mistral | `MISTRAL_API_KEY` | Mistral Large, Small, and Codestral. |
+    | GitHub Copilot | `GH_TOKEN` | OAuth-based — sign in via browser with `gsd config`. |
+
+    Set any of these as environment variables before starting GSD:
+
+    ```bash
+    export ANTHROPIC_API_KEY="sk-ant-..."
+    gsd
+    ```
+
+    Or save them permanently with `gsd config` — keys are stored in `~/.gsd/agent/auth.json` and apply to all projects automatically.
+  </Tab>
+
+  <Tab title="Cloud Infrastructure">
+    | Provider | Auth Method | Configuration |
+    |----------|-------------|---------------|
+    | Amazon Bedrock | IAM credentials | `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` + `AWS_REGION` |
+    | Anthropic on Vertex AI | Application Default Credentials | Run `gcloud auth application-default login`, set `ANTHROPIC_VERTEX_PROJECT_ID` |
+    | Azure OpenAI | API key | `AZURE_OPENAI_API_KEY` |
+
+    **Bedrock example:**
+
+    ```bash
+    export AWS_PROFILE="my-bedrock-profile"
+    gsd
+    ```
+
+    ECS task roles and IRSA (Kubernetes) are detected automatically for Bedrock.
+
+    **Vertex AI example:**
+
+    ```bash
+    gcloud auth application-default login
+    export ANTHROPIC_VERTEX_PROJECT_ID="my-gcp-project"
+    gsd
+    ```
+  </Tab>
+
+  <Tab title="Local Models">
+    Local providers run on your machine and require a `~/.gsd/agent/models.json` configuration file so GSD knows the endpoint URL and which models are available.
+
+    **Ollama:**
+
+    ```bash
+    # Start Ollama and pull a model
+    ollama serve
+    ollama pull llama3.1:8b
+    ```
+
+    ```json
+    {
+      "providers": {
+        "ollama": {
+          "baseUrl": "http://localhost:11434/v1",
+          "api": "openai-completions",
+          "apiKey": "ollama",
+          "compat": {
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": false
+          },
+          "models": [
+            { "id": "llama3.1:8b" },
+            { "id": "qwen2.5-coder:7b" }
+          ]
+        }
+      }
+    }
+    ```
+
+    Set `OLLAMA_HOST` to override the default server URL:
+
+    ```bash
+    export OLLAMA_HOST="http://my-ollama-server:11434"
+    ```
+
+    For remote Ollama endpoints that require authentication:
+
+    ```bash
+    export OLLAMA_API_KEY="your-bearer-token"
+    ```
+
+    **LM Studio, vLLM, SGLang:** Follow the same `models.json` pattern, adjusting `baseUrl` and `apiKey` for your server. Set `compat.supportsDeveloperRole: false` and `compat.supportsReasoningEffort: false` for all local inference servers.
+  </Tab>
+</Tabs>
+
+## Listing Available Models
+
+List all models GSD can find with your current credentials:
+
+```bash
+gsd --list-models
+```
+
+Filter by name or provider:
+
+```bash
+gsd --list-models claude
+gsd --list-models gpt-4
+gsd --list-models openrouter
+```
+
+## Overriding the Model for a Session
+
+Pass `--model` when starting GSD to use a specific model for that session, ignoring whatever is set in preferences:
+
+```bash
+gsd --model claude-opus-4-6
+gsd --model openrouter/deepseek/deepseek-r1
+```
+
+## Switching Models In-Session
+
+Change the active model without restarting the session:
+
+```text
+/gsd model
+```
+
+This opens an interactive model picker showing all available models from your configured providers. The `models.json` file reloads each time you open the picker — no restart needed.
+
+You can also switch directly:
+
+```text
+/gsd model claude-haiku-4-5-20250414
+```
+
+## Claude Fable 5
+
+Claude Fable 5 is an Opus-tier Anthropic model that ships across the Anthropic API, Anthropic on Vertex AI, Amazon Bedrock, and OpenRouter. Pi treats it the same as `claude-opus-4-8`: it advertises a 1M-token context window, 128K max output, image and text input, and adaptive thinking with the `xhigh` effort level enabled by default.
+
+Use it when you want maximum reasoning quality on planning, debugging, or long-context refactors and you're willing to spend Opus-tier dollars (or, on a Claude Pro / Max / Team / Enterprise subscription, route through Claude Code for subscription-covered usage).
+
+Once your Anthropic credentials are configured, Claude Fable 5 appears in the model picker by ID:
+
+```text
+/gsd model claude-fable-5
+```
+
+Or pin it for a specific phase in `PREFERENCES.md`:
+
+```yaml
+models:
+  planning: claude-fable-5
+  execution: claude-sonnet-4-6
+```
+
+To use Claude Fable 5 through a non-direct provider, prefix the model ID with the provider:
+
+```yaml
+models:
+  planning: bedrock/claude-fable-5
+  execution: vertex/claude-fable-5
+```
+
+When invoked through the Claude Code CLI, `claude-fable-5` is also exposed on the heavy routing tier with subscription-covered pricing and the `context-1m-2025-08-07` beta enabled automatically.
+
+## Using Claude Subscriptions via Claude Code
+
+If you have a Claude Pro, Max, Team, or Enterprise subscription, authenticate through Anthropic's official Claude Code CLI instead of an API key:
+
+```bash
+# Install and sign into Claude Code
+claude
+
+# Then start GSD — it detects Claude Code automatically
+gsd
+```
+
+GSD detects your local Claude Code installation and routes through it automatically. This is the terms-of-service-compliant path for subscription users — GSD never handles your subscription credentials directly.
+
+## Adding Custom or Unlisted Models
+
+Define custom models, local endpoints, and OpenAI-compatible proxies in `~/.gsd/agent/models.json`:
+
+```json
+{
+  "providers": {
+    "my-custom-endpoint": {
+      "baseUrl": "https://my-proxy.example.com/v1",
+      "apiKey": "MY_PROVIDER_API_KEY",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "my-model-id",
+          "name": "My Custom Model",
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": { "input": 0.15, "output": 0.60, "cacheRead": 0, "cacheWrite": 0 }
+        }
+      ]
+    }
+  }
+}
+```
+
+The `apiKey` value is the name of the environment variable GSD should read (not the literal key). GSD resolves it automatically at runtime.
+
+## Per-Phase Model Routing
+
+Assign different providers or models to different phases of the auto-mode pipeline in `PREFERENCES.md`:
+
+```yaml
+models:
+  research: openrouter/deepseek/deepseek-r1    # Cheaper for research
+  planning: claude-opus-4-6                     # Best quality for planning
+  execution: claude-sonnet-4-6                  # Balanced for execution
+  execution_simple: claude-haiku-4-5-20250414   # Fast and cheap for simple tasks
+```
+
+## Verifying Your Setup
+
+After configuring a provider, verify everything is working:
+
+<Steps>
+  <Step title="Start GSD">
+    ```bash
+    gsd
+    ```
+  </Step>
+  <Step title="Open the model picker">
+    ```text
+    /gsd model
+    ```
+    Your provider's models should appear in the list.
+  </Step>
+  <Step title="Run a health check">
+    ```text
+    /gsd doctor
+    ```
+    GSD checks provider connectivity and reports any credential or configuration issues.
+  </Step>
+</Steps>
+
+If a model doesn't appear, check that:
+- The environment variable is exported in the current shell
+- `~/.gsd/agent/models.json` is valid JSON (`cat ~/.gsd/agent/models.json | python3 -m json.tool`)
+- The local inference server is running (for Ollama, LM Studio, etc.)

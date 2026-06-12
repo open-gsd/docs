@@ -1,0 +1,175 @@
+---
+title: "GSD Pi Setup: Install on macOS, Linux, and Windows"
+sidebarTitle: "Installation"
+description: "Install GSD Pi globally with the guided installer or npm. Requires Node.js 22 or later. Platform binaries download automatically on first run."
+---
+
+GSD Pi is published as `@opengsd/gsd-pi` on npm and installs as a global `gsd` binary. The recommended path is the interactive guided installer, which walks you through provider setup, configures your first LLM, and verifies the installation — all in one step.
+
+## Prerequisites
+
+Before you install, make sure you have the following:
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| Node.js | 22.0.0 | 24 LTS |
+| npm | Bundled with Node.js | Latest LTS bundled version |
+| Git | 2.20 | Latest stable |
+| LLM provider credentials | One supported provider | The provider your team already uses |
+
+Verify your environment:
+
+```bash
+node --version
+npm --version
+git --version
+```
+
+## Install
+
+<Tabs>
+  <Tab title="Guided Installer (Recommended)">
+    Run the guided installer with `npx`. It installs the package globally, walks you through provider configuration, and confirms the `gsd` command is on your `PATH`:
+
+    ```bash
+    npx @opengsd/gsd-pi@latest
+    ```
+
+    For CI or non-interactive environments, pass `--yes` to accept all defaults:
+
+    ```bash
+    npx @opengsd/gsd-pi@latest --yes
+    ```
+
+    The guided installer handles the full setup flow — you only need to supply your API key for your chosen LLM provider.
+  </Tab>
+  <Tab title="npm Global Install">
+    If you prefer a direct global install without the guided setup flow, install the package with npm:
+
+    ```bash
+    npm install -g @opengsd/gsd-pi
+    ```
+
+    After the install completes, run `gsd config` to configure your LLM provider before starting your first session.
+  </Tab>
+  <Tab title="pnpm">
+    If you manage global packages with pnpm, run the setup step first to ensure the global bin directory is on your `PATH`, then use pnpm's package runner:
+
+    ```bash
+    pnpm setup
+    exec $SHELL -l
+    pnpm dlx @opengsd/gsd-pi@latest
+    ```
+
+    <Note>
+      If pnpm reports that its global bin directory is not on `PATH`, run `pnpm setup`, restart your shell, and retry.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Verify the Installation
+
+Once the install finishes, confirm the `gsd` command is available:
+
+```bash
+gsd --version
+```
+
+```bash
+gsd --help
+```
+
+If `gsd` is not found, your npm global bin directory may not be on `PATH`. Find the correct path with:
+
+```bash
+npm prefix -g
+```
+
+Add the `bin` subdirectory of that path to your shell profile, then open a new terminal.
+
+## Configure Your Provider
+
+If you used the guided installer, your provider is already configured. If you installed directly with npm, run the setup wizard now:
+
+```bash
+gsd config
+```
+
+The wizard walks you through:
+
+- Choosing an LLM provider (Anthropic, OpenAI, Gemini, OpenRouter, and more)
+- Entering your API key or signing in via OAuth (GitHub Copilot)
+- Selecting default model preferences
+- Optionally configuring tool API keys for web search and documentation lookup
+
+You can re-run `gsd config` at any time from your shell to update credentials or add a new provider.
+
+## Platform Binaries
+
+Pi ships with native platform binaries for performance-critical operations. They download automatically the first time you run `gsd` — no manual steps required.
+
+Supported platforms:
+
+<CardGroup cols={2}>
+  <Card title="macOS" icon="apple">
+    arm64 (Apple Silicon) and x64 (Intel)
+  </Card>
+  <Card title="Linux" icon="linux">
+    arm64 and x64
+  </Card>
+  <Card title="Windows" icon="windows">
+    x64
+  </Card>
+  <Card title="Docker" icon="docker">
+    Official image available — see the `Dockerfile` in the repository
+  </Card>
+</CardGroup>
+
+## Upgrade
+
+After the first install, upgrade to the latest version from your shell:
+
+```bash
+gsd upgrade
+```
+
+You can also run the upgrade from inside a GSD session with `/gsd update`.
+
+## Migrate From an Older Install
+
+If you previously installed the unscoped `gsd-pi` package, remove it before installing the new scoped package to avoid a shadowed binary:
+
+<CodeGroup>
+```bash macOS / Linux
+npm uninstall -g gsd-pi @opengsd/gsd-pi
+rm -f ~/.gsd/.update-check ~/.gsd/agent/managed-resources.json
+npx @opengsd/gsd-pi@latest
+```
+
+```powershell Windows PowerShell
+npm uninstall -g gsd-pi @opengsd/gsd-pi
+Remove-Item "$env:USERPROFILE\.gsd\.update-check" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.gsd\agent\managed-resources.json" -Force -ErrorAction SilentlyContinue
+npx @opengsd/gsd-pi@latest
+```
+</CodeGroup>
+
+## Uninstall
+
+To remove GSD Pi and all local state:
+
+<CodeGroup>
+```bash macOS / Linux
+npm uninstall -g @opengsd/gsd-pi
+rm -rf ~/.gsd
+```
+
+```powershell Windows PowerShell
+npm uninstall -g @opengsd/gsd-pi
+Remove-Item "$env:USERPROFILE\.gsd" -Recurse -Force -ErrorAction SilentlyContinue
+```
+</CodeGroup>
+
+<Warning>
+  Removing `~/.gsd` deletes your global preferences, saved API keys, and all per-project state stored outside your repositories. Back up anything you want to keep before uninstalling.
+</Warning>

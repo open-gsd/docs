@@ -1,0 +1,194 @@
+---
+title: "GSD Browser MCP Setup for Claude, Cursor, and VS Code"
+sidebarTitle: "AI Agent Setup"
+description: "Wire GSD Browser into Claude Desktop, Cursor, VS Code Copilot, or GSD Pi in minutes using the Model Context Protocol stdio transport."
+---
+
+GSD Browser exposes its full automation surface — 50+ tools, live resources, and executable prompts — through the [Model Context Protocol](https://modelcontextprotocol.io/) (MCP). Connecting your AI agent takes one config block and a restart. Once connected, your agent can navigate pages, interact with elements via stable versioned refs, record evidence bundles, control the live viewer, and more — all without writing a line of browser code.
+
+## Prerequisites
+
+Install GSD Browser before configuring any client:
+
+```bash
+cargo install --path cli
+```
+
+Verify the installation:
+
+```bash
+gsd-browser --version
+```
+
+## Connect Your Agent
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Open your Claude Desktop configuration file:
+
+    - **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+    - **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+    Add the `gsd-browser` entry inside `mcpServers`:
+
+    ```json claude_desktop_config.json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "command": "gsd-browser",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+
+    Restart Claude Desktop. The GSD Browser tools appear automatically in the tool list.
+
+    <Tip>
+      Set `GSD_BROWSER_VAULT_KEY` and `GSD_BROWSER_BROWSER_PATH` in an `"env"` block inside the server entry to configure your vault encryption key and Chrome path before the daemon first starts.
+    </Tip>
+  </Tab>
+
+  <Tab title="Cursor">
+    Open **Cursor Settings** → **MCP** tab → **Add Server**.
+
+    Fill in the fields:
+
+    | Field | Value |
+    |-------|-------|
+    | Name | `gsd-browser` |
+    | Command | `gsd-browser` |
+    | Args | `mcp` |
+
+    Save and reload the window. Cursor discovers the available tools automatically.
+
+    Alternatively, add the entry directly to your Cursor MCP config file:
+
+    ```json .cursor/mcp.json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "command": "gsd-browser",
+          "args": ["mcp"],
+          "env": {
+            "GSD_BROWSER_BROWSER_PATH": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "GSD_BROWSER_VAULT_KEY": "your-strong-key-here"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+
+  <Tab title="VS Code Copilot">
+    Create or edit `.vscode/mcp.json` at the root of your workspace:
+
+    ```json .vscode/mcp.json
+    {
+      "servers": {
+        "gsd-browser": {
+          "type": "stdio",
+          "command": "gsd-browser",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+
+    VS Code picks up the file automatically. Open the **GitHub Copilot Chat** panel and switch to **Agent** mode — GSD Browser tools are available immediately.
+
+    <Note>
+      The `"type": "stdio"` field is required for VS Code's MCP client. Claude Desktop and Cursor infer the transport automatically.
+    </Note>
+  </Tab>
+
+  <Tab title="GSD Pi">
+    GSD Browser ships as a bundled extension in GSD Pi called `browser-tools`. Enable it with a single command:
+
+    ```bash
+    /gsd extensions enable browser-tools
+    ```
+
+    No additional configuration is needed — GSD Pi manages the daemon lifecycle and session isolation automatically. Use `/gsd extensions list` to confirm the extension is active.
+  </Tab>
+</Tabs>
+
+## Verify the Connection
+
+After restarting your client, ask your agent:
+
+> "List the available GSD Browser tools."
+
+The agent should respond with the full tool manifest (50+ entries). You can also ask it to read a live resource:
+
+> "Read the gsd-browser://latest-snapshot resource and describe what's on the current page."
+
+## Remote / Hosted Mode
+
+If your MCP client is hosted (not running locally), expose the server over HTTP instead of stdio:
+
+```bash
+export GSD_BROWSER_MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+gsd-browser mcp --http --host 0.0.0.0 --port 8788
+```
+
+Point your remote client at `https://your-domain.example/mcp` with the `Authorization: Bearer <token>` header.
+
+<Warning>
+  Non-loopback hosts refuse unauthenticated startup by default. Pass `--no-auth` only when you are certain the endpoint is not publicly reachable.
+</Warning>
+
+## Best Practices for AI Agents
+
+Follow these rules to get reliable, reproducible results from your connected agent.
+
+<AccordionGroup>
+  <Accordion title="Always snapshot before interacting with refs">
+    Call `browser_snapshot` (or read the `gsd-browser://latest-snapshot` resource) after every navigation or major DOM change. Refs are versioned — `@v1:e1`, `@v2:e3`, etc. — and become stale the moment the page updates. Stale refs return an error; retake a snapshot to get fresh ones.
+
+    ```
+    browser_navigate → browser_snapshot → use @v1:* refs → page changes → browser_snapshot → use @v2:* refs
+    ```
+  </Accordion>
+
+  <Accordion title="Prefer semantic browser_act over raw selectors">
+    Use `browser_act` with a semantic intent (e.g., `submit_form`, `accept_cookies`, `fill_email`) for common patterns. Semantic actions are self-healing and require no prior snapshot. Fall back to snapshot + ref tools only when you need precision on a complex widget.
+  </Accordion>
+
+  <Accordion title="Use named sessions for state isolation">
+    Pass `--session <name>` (or the `session` parameter in MCP calls) to create an isolated browser context per project. Named sessions also persist the action cache across runs, so the agent learns stable selector mappings over time.
+
+    ```json
+    { "command": "gsd-browser", "args": ["mcp", "--session", "my-project"] }
+    ```
+  </Accordion>
+
+  <Accordion title="Handle stale ref errors by retaking a snapshot">
+    If a `_ref` tool returns a stale-ref error, do not retry with the same ref. Call `browser_snapshot` immediately to obtain a fresh `@v(N+1):*` set, then repeat the interaction.
+  </Accordion>
+
+  <Accordion title="Follow suggested_next_actions in every response">
+    Every GSD Browser MCP tool returns a structured envelope with a `suggested_next_actions` field. These are concrete, high-signal hints generated from the current page state. Reading and acting on them is the fastest path to robust automation.
+  </Accordion>
+</AccordionGroup>
+
+## Built-in Prompts
+
+GSD Browser ships executable multi-step prompts you can invoke directly from your agent:
+
+<CardGroup cols={2}>
+  <Card title="robust_login_flow" icon="right-to-bracket">
+    Handles cookie banners, fills credentials, waits for auth, and saves session state — all in one prompt.
+  </Card>
+  <Card title="full_page_audit" icon="magnifying-glass">
+    Runs snapshot, console, network, and visual diff checks in parallel and synthesizes findings.
+  </Card>
+  <Card title="evidence_creation_workflow" icon="film">
+    Starts a recording, annotates key decision points, exports the bundle, and generates a Playwright regression test.
+  </Card>
+  <Card title="debug_stuck_agent_flow" icon="bug">
+    Captures a debug bundle, console log, network log, and timeline to explain why the agent is stuck.
+  </Card>
+</CardGroup>
+
+Ask your agent: *"Use the gsd-browser prompt `robust_login_flow` with `start_url` set to `https://app.example.com/login`."*

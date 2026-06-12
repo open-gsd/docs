@@ -1,0 +1,391 @@
+---
+title: "GSD Core Workflow Commands: Phase Pipeline Reference"
+sidebarTitle: "Workflow"
+description: "Reference for every phase-pipeline command in GSD Core — from project initialization through discussion, planning, execution, verification, and shipping."
+---
+
+The workflow commands form the backbone of GSD Core's phase pipeline. Each command maps to one discrete step in the loop: initialize → discuss → plan → execute → verify → ship. Run them in order for a new project, or invoke any individual command when you need to repeat or adjust a specific step. All commands read from and write to the `.planning/` directory at your project root.
+
+---
+
+## `/gsd-new-project`
+
+Initialize a new project with deep context gathering.
+
+**Syntax**
+
+```bash
+/gsd-new-project
+/gsd-new-project --auto @brief.md
+```
+
+**What it does**
+
+Walks you through a structured questioning flow, optionally runs domain research, then generates requirements and a phase roadmap. All subsequent workflow commands build on the artifacts this command produces.
+
+**Produces**
+
+| Artifact | Purpose |
+|---|---|
+| `.planning/PROJECT.md` | Project context and goals |
+| `.planning/config.json` | Workflow preferences |
+| `.planning/REQUIREMENTS.md` | Scoped requirements |
+| `.planning/ROADMAP.md` | Phase structure |
+| `.planning/STATE.md` | Project memory |
+| `.planning/research/` | Domain research (when research runs) |
+
+**Flags**
+
+<ParamField query="--auto" type="flag">
+  Automatic mode. Skips interactive questioning and runs research → requirements → roadmap without further interaction. Pass your idea document via an `@` reference, for example `--auto @brief.md`.
+</ParamField>
+
+**Next step:** Run `/gsd-plan-phase 1` to begin the first phase.
+
+---
+
+## `/gsd-discuss-phase N`
+
+Gather phase context through adaptive questioning before planning.
+
+**Syntax**
+
+```bash
+/gsd-discuss-phase 2
+/gsd-discuss-phase 3 --auto
+/gsd-discuss-phase 4 --power
+/gsd-discuss-phase 5 --assumptions
+```
+
+**What it does**
+
+Loads prior context from `PROJECT.md`, `REQUIREMENTS.md`, `STATE.md`, and any earlier `CONTEXT.md` files. Scouts the codebase for reusable assets, identifies unresolved gray areas, guides you through a deep-dive on any you choose to discuss, and writes a `CONTEXT.md` that gives the planner and researcher everything they need — so they never have to ask you the same question twice.
+
+**Produces**
+
+`{phase_num}-CONTEXT.md` — locked decisions and scope guidance for downstream agents.
+
+**Flags**
+
+<ParamField query="--all" type="flag">
+  Discuss all identified gray areas in one session rather than letting you pick a subset.
+</ParamField>
+
+<ParamField query="--auto" type="flag">
+  Auto-answer discussion questions using existing context. Useful in autonomous or CI pipelines where interactive input is not available.
+</ParamField>
+
+<ParamField query="--batch" type="flag">
+  Group related gray areas and address them together instead of one at a time.
+</ParamField>
+
+<ParamField query="--analyze" type="flag">
+  Run a deeper analysis pass on the codebase before presenting gray areas.
+</ParamField>
+
+<ParamField query="--power" type="flag">
+  Power mode. Runs an extended questioning protocol with richer probing — best for complex or ambiguous phases.
+</ParamField>
+
+<ParamField query="--assumptions" type="flag">
+  List the assumptions implicit in the current phase plan instead of opening a discussion session.
+</ParamField>
+
+---
+
+## `/gsd-ui-phase N`
+
+Generate a UI design contract for frontend phases.
+
+**Syntax**
+
+```bash
+/gsd-ui-phase 3
+```
+
+**What it does**
+
+Orchestrates a `gsd-ui-researcher` and a `gsd-ui-checker` to produce a `UI-SPEC.md` design contract for a frontend phase. Run this before `/gsd-plan-phase` on any phase that involves user-facing components so the planner has a verified UI specification to work from.
+
+**Produces**
+
+`{phase_num}-UI-SPEC.md` — design contract covering component structure, interaction patterns, and brand alignment.
+
+---
+
+## `/gsd-plan-phase N`
+
+Research, plan, and verify a phase — the core planning step.
+
+**Syntax**
+
+```bash
+/gsd-plan-phase 1
+/gsd-plan-phase 2 --skip-research
+/gsd-plan-phase 3 --research
+/gsd-plan-phase 4 --mvp --tdd
+/gsd-plan-phase --research-phase 2
+```
+
+**What it does**
+
+Runs the full planning pipeline: optional domain research → `gsd-planner` agent → `gsd-plan-checker` verification loop → plan approval. By default it auto-detects the next unplanned phase if you omit the phase number.
+
+**Produces**
+
+`{phase_num}-PLAN.md` files containing executable prompts for each task in the phase, plus `RESEARCH.md` when research runs.
+
+**Flags**
+
+<ParamField query="--research" type="flag">
+  Force-refresh research even when a `RESEARCH.md` already exists for this phase.
+</ParamField>
+
+<ParamField query="--skip-research" type="flag">
+  Skip research entirely and go straight to planning. Use when the implementation approach is already clear.
+</ParamField>
+
+<ParamField query="--research-phase N" type="string">
+  Research-only mode. Spawns the researcher for phase `N`, writes `RESEARCH.md`, and exits before the planner runs. Useful for cross-phase research or iterating on research alone without replanning.
+</ParamField>
+
+<ParamField query="--gaps" type="flag">
+  Gap-closure mode. Reads `VERIFICATION.md` and re-plans only to address verified gaps. Skips research.
+</ParamField>
+
+<ParamField query="--prd" type="string">
+  Path to a PRD or acceptance-criteria file. Parses requirements into `CONTEXT.md` automatically, skipping the discuss phase entirely. Example: `--prd docs/prd.md`.
+</ParamField>
+
+<ParamField query="--ingest" type="string">
+  Path or glob of ADR files to use instead of a discuss session. Parses locked decisions and scope fences into `CONTEXT.md`. Example: `--ingest docs/adr/*.md`.
+</ParamField>
+
+<ParamField query="--mvp" type="flag">
+  Vertical MVP mode. Organizes tasks as feature slices (UI → API → DB) instead of horizontal layers. On Phase 1 of a new project, also emits a `SKELETON.md` walking skeleton document. Persist this mode for a phase by adding `**Mode:** mvp` to `ROADMAP.md`.
+</ParamField>
+
+<ParamField query="--tdd" type="flag">
+  TDD mode. Instructs the planner to organize tasks around test-first RED-GREEN cycles.
+</ParamField>
+
+<ParamField query="--reviews" type="flag">
+  Replan incorporating cross-AI feedback from a `REVIEWS.md` file produced by `/gsd-review`.
+</ParamField>
+
+<ParamField query="--skip-verify" type="flag">
+  Skip the plan-checker verification loop and present the plan immediately after the planner completes.
+</ParamField>
+
+---
+
+## `/gsd-plan-review-convergence N`
+
+Run a cross-AI convergence loop until no HIGH-severity concerns remain.
+
+**Syntax**
+
+```bash
+/gsd-plan-review-convergence 3
+/gsd-plan-review-convergence 3 --gemini --codex
+/gsd-plan-review-convergence 3 --all --max-cycles 5
+```
+
+**What it does**
+
+Repeatedly runs external AI reviewers against the phase plan, feeds HIGH-severity findings back into the planner via `--reviews`, then re-reviews. Stops when no HIGH concerns remain or the cycle cap is reached. Requires `workflow.plan_review_convergence=true` in your config.
+
+**Flags**
+
+<ParamField query="--codex" type="flag">
+  Use Codex CLI as the reviewer. Default when no reviewer flag is specified.
+</ParamField>
+
+<ParamField query="--gemini" type="flag">
+  Use Gemini CLI as the reviewer.
+</ParamField>
+
+<ParamField query="--claude" type="flag">
+  Use a separate Claude CLI session as the reviewer.
+</ParamField>
+
+<ParamField query="--opencode" type="flag">
+  Use OpenCode as the reviewer.
+</ParamField>
+
+<ParamField query="--ollama" type="flag">
+  Use a local Ollama server (OpenAI-compatible, default host `http://localhost:11434`). Configure the model via `review.models.ollama`.
+</ParamField>
+
+<ParamField query="--lm-studio" type="flag">
+  Use a local LM Studio server (default host `http://localhost:1234`). Configure the model via `review.models.lm_studio`.
+</ParamField>
+
+<ParamField query="--llama-cpp" type="flag">
+  Use a local llama.cpp server (default host `http://localhost:8080`). Configure the model via `review.models.llama_cpp`.
+</ParamField>
+
+<ParamField query="--all" type="flag">
+  Use every available CLI and running local model server.
+</ParamField>
+
+<ParamField query="--max-cycles N" type="number">
+  Maximum number of replan → review cycles before escalating to you. Default: `3`.
+</ParamField>
+
+---
+
+## `/gsd-execute-phase N`
+
+Execute all plans in a phase with wave-based parallelization.
+
+**Syntax**
+
+```bash
+/gsd-execute-phase 2
+/gsd-execute-phase 3 --wave 1
+/gsd-execute-phase 4 --gaps-only
+/gsd-execute-phase 5 --interactive
+```
+
+**What it does**
+
+Discovers all plan files in the phase, analyzes task dependencies, groups them into parallel execution waves, spawns subagents for each wave, and collects results. Phase verification and completion only trigger when no incomplete plans remain after the selected wave finishes.
+
+**Flags**
+
+<ParamField query="--wave N" type="number">
+  Execute only Wave `N` of the phase. Use to pace execution, manage API usage limits, or perform a staged rollout.
+</ParamField>
+
+<ParamField query="--gaps-only" type="flag">
+  Execute only gap-closure plans — those with `gap_closure: true` in their frontmatter. Run this after `/gsd-verify-work` creates fix plans.
+</ParamField>
+
+<ParamField query="--interactive" type="flag">
+  Execute plans sequentially inline (no subagents) with user checkpoints between tasks. Lower token usage, pair-programming style. Best for small phases, bug fixes, and verification gap closures.
+</ParamField>
+
+---
+
+## `/gsd-verify-work N`
+
+Validate built features through conversational UAT with auto-diagnosis.
+
+**Syntax**
+
+```bash
+/gsd-verify-work 3
+/gsd-verify-work
+```
+
+**What it does**
+
+Runs a conversational user acceptance test against the features built in the specified phase. Presents one test at a time in plain language, tracks results in a `UAT.md` file, and when issues are found automatically diagnoses root causes, produces fix plans, and queues them for `/gsd-execute-phase`. If you omit the phase number it checks for an active session or prompts you.
+
+**Produces**
+
+`{phase_num}-UAT.md` — test results with pass/fail status. When issues are found: diagnosed gap descriptions and verified fix plans ready for re-execution.
+
+---
+
+## `/gsd-ship N`
+
+Create a pull request and prepare the phase for merge.
+
+**Syntax**
+
+```bash
+/gsd-ship 4
+/gsd-ship 4 --draft
+```
+
+**What it does**
+
+Bridges local completion to a merged pull request. Pushes the phase branch, creates a PR with an auto-generated body summarizing what was built, optionally triggers a review, and tracks the merge. Closes the plan → execute → verify → ship loop.
+
+**Flags**
+
+<ParamField query="--draft" type="flag">
+  Open the pull request as a draft instead of a ready-for-review PR. Use when you want the branch visible to your team but not yet requesting review.
+</ParamField>
+
+---
+
+## `/gsd-progress`
+
+Check where you are and what comes next.
+
+**Syntax**
+
+```bash
+/gsd-progress
+/gsd-progress --next
+/gsd-progress --next --auto
+/gsd-progress --do "add rate limiting to the API"
+/gsd-progress --forensic
+```
+
+**What it does**
+
+Your unified situational command. In default mode it shows a progress report and intelligently routes to the next action. With `--next` it advances automatically. With `--do` it maps natural language intent to the most appropriate GSD command, confirms the match, and hands off.
+
+**Flags**
+
+<ParamField query="--next" type="flag">
+  Automatically advance to the next logical workflow step. Scans all prior phases for incomplete work before routing. Add `--force` to bypass safety gates.
+</ParamField>
+
+<ParamField query="--next --auto" type="flag">
+  Like `--next`, but after the determined step completes, re-invokes `/gsd-progress --next --auto` automatically to keep chaining steps. Enables hands-free plan → execute → verify progression until a blocking decision is required.
+</ParamField>
+
+<ParamField query='--do "task description"' type="string">
+  Smart dispatcher. Matches freeform natural language to the best GSD command using routing rules, confirms the match, then hands off execution.
+</ParamField>
+
+<ParamField query="--forensic" type="flag">
+  Append a 6-check integrity audit after the standard progress report.
+</ParamField>
+
+---
+
+## `/gsd-autonomous`
+
+Run all remaining phases without manual intervention.
+
+**Syntax**
+
+```bash
+/gsd-autonomous
+/gsd-autonomous --from 3
+/gsd-autonomous --from 2 --to 5
+/gsd-autonomous --only 4
+/gsd-autonomous --interactive
+```
+
+**What it does**
+
+Executes every remaining milestone phase in sequence: discuss → plan → execute per phase. Pauses only for user decisions on gray areas, blockers, or validation gates. After all phases complete, runs a milestone audit, completes the milestone, and runs cleanup.
+
+**Flags**
+
+<ParamField query="--from N" type="number">
+  Start from phase `N` instead of the first incomplete phase.
+</ParamField>
+
+<ParamField query="--to N" type="number">
+  Stop after phase `N` completes instead of continuing to the end of the milestone.
+</ParamField>
+
+<ParamField query="--only N" type="number">
+  Execute only phase `N` — single-phase mode.
+</ParamField>
+
+<ParamField query="--interactive" type="flag">
+  Run the discuss step inline so you can answer questions directly, then dispatch plan and execute as background agents. Keeps the main context lean while preserving your input on decisions.
+</ParamField>
+
+<ParamField query="--text" type="flag">
+  Use plain-text numbered lists instead of interactive TUI menus. Required for `/rc` remote sessions.
+</ParamField>

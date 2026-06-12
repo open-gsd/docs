@@ -1,0 +1,225 @@
+---
+title: "Model Routing and Multi-Provider Configuration in GSD Pi"
+sidebarTitle: "Model Routing"
+description: "GSD Pi supports 15+ LLM providers with per-phase model configuration, dynamic complexity routing, token profiles, and fallback chains."
+---
+
+GSD Pi works with a wide range of LLM providers and gives you precise control over which model runs at each phase of the development workflow. You can set a different model for research, planning, implementation, and simpler tasks — letting you optimize for quality where it matters and cost where it doesn't.
+
+## Supported Providers
+
+Pi supports the following providers out of the box:
+
+<CardGroup cols={2}>
+  <Card title="Cloud APIs" icon="cloud">
+    Anthropic (Claude), OpenAI, Google Gemini, OpenRouter, Groq, xAI (Grok), Mistral, GitHub Copilot, Amazon Bedrock, Vertex AI (Claude on Google Cloud), Azure OpenAI
+  </Card>
+  <Card title="Local / Self-Hosted" icon="server">
+    Ollama, LM Studio, vLLM, SGLang — any OpenAI-compatible endpoint also works via custom configuration in `~/.gsd/agent/models.json`
+  </Card>
+</CardGroup>
+
+Configure your provider credentials with `/gsd config` inside a session, or export the relevant environment variable before starting Pi. See the [Provider Setup guide](/pi/configuration/providers) for per-provider credential instructions.
+
+## Per-Phase Model Configuration
+
+Pi executes different types of work at each phase of the auto-mode loop. Configure which model handles each phase in `.gsd/PREFERENCES.md`:
+
+```yaml
+models:
+  research: claude-sonnet-4-6
+  planning: claude-opus-4-6
+  execution: claude-sonnet-4-6
+  execution_simple: claude-haiku-4-5-20250414
+  completion: claude-sonnet-4-6
+  subagent: claude-sonnet-4-6
+```
+
+| Phase | When it runs |
+|-------|-------------|
+| `research` | Milestone and slice research phases |
+| `planning` | Milestone and slice planning, roadmap creation |
+| `execution` | Task implementation (the main coding work) |
+| `execution_simple` | Tasks classified as low-complexity by the dynamic router |
+| `completion` | Slice and milestone completion summaries |
+| `subagent` | Delegated subagent sessions (scout, researcher, reviewer, tester) |
+
+Omit any phase key to use whichever model is currently active as the default.
+
+## Token Profiles
+
+Token profiles provide a quick way to balance cost, quality, and speed across the whole workflow:
+
+| Profile | Behavior |
+|---------|----------|
+| `budget` | Skips research and reassessment phases; uses lighter models |
+| `balanced` | All phases run with standard model selection (default) |
+| `quality` | All phases run; prefers higher-capability models |
+
+```yaml
+token_profile: balanced
+```
+
+Token profiles work alongside per-phase model settings. The profile sets the baseline behavior; explicit `models.*` entries override the profile for specific phases.
+
+## Dynamic Model Routing
+
+Dynamic routing automatically selects a cheaper model for simple work and reserves your more capable models for complex tasks. It classifies each unit of work into a complexity tier — light, standard, or heavy — and routes accordingly.
+
+Enable it in `.gsd/PREFERENCES.md`:
+
+```yaml
+dynamic_routing:
+  enabled: true
+```
+
+### Complexity Tiers
+
+| Tier | Typical Work |
+|------|-------------|
+| **Light** | Slice completion, UAT, hooks, documentation tasks |
+| **Standard** | Research, planning, task execution, milestone completion |
+| **Heavy** | Replanning, roadmap reassessment, complex architectural tasks |
+
+The router uses **downgrade-only semantics** — your configured model is always the ceiling. Dynamic routing never upgrades beyond what you've explicitly configured.
+
+### Full Configuration
+
+```yaml
+dynamic_routing:
+  enabled: true
+  tier_models:
+    light: claude-haiku-4-5
+    standard: claude-sonnet-4-6
+    heavy: claude-opus-4-6
+  escalate_on_failure: true     # bump tier up on task failure
+  budget_pressure: true         # auto-downgrade as budget ceiling approaches
+  cross_provider: true          # consider models across all configured providers
+  capability_routing: true      # score models by task capability within tier
+```
+
+### Capability-Aware Scoring
+
+When `capability_routing: true` is set (the default), Pi scores eligible models within the selected tier against the task's requirements before choosing. Scores are computed across seven dimensions:
+
+| Dimension | What it measures |
+|-----------|-----------------|
+| `coding` | Code generation and implementation accuracy |
+| `debugging` | Diagnosing and fixing errors |
+| `research` | Synthesizing information and exploring topics |
+| `reasoning` | Multi-step logical reasoning |
+| `speed` | Latency and throughput |
+| `longContext` | Handling large codebases and long documents |
+| `instruction` | Following structured instructions precisely |
+
+Different unit types weight these dimensions differently. For example, `execute-task` weights `coding` and `instruction` heavily, while `research-*` units weight `research` and `longContext`.
+
+<Tip>
+  When two models score within 2 points of each other, Pi picks the cheaper one. Cost ties break alphabetically by model ID for deterministic behavior.
+</Tip>
+
+### Budget Pressure
+
+When `budget_pressure: true` is enabled, Pi progressively downgrades model selection as you approach your spending ceiling:
+
+| Budget Used | Effect |
+|------------|--------|
+| < 50% | No adjustment |
+| 50–75% | Standard → Light for eligible units |
+| 75–90% | More aggressive downgrading |
+| > 90% | Nearly everything → Light; only Heavy stays at Standard |
+
+## Fallback Chains
+
+Configure a list of fallback models for any phase. Pi tries each in order if the primary model fails — useful for rate limits, provider outages, or quota exhaustion:
+
+```yaml
+models:
+  planning:
+    model: claude-opus-4-6
+    fallbacks:
+      - openrouter/z-ai/glm-5
+      - openrouter/moonshotai/kimi-k2.5
+  execution:
+    model: claude-sonnet-4-6
+    fallbacks:
+      - gpt-4o
+      - gemini-2.5-pro
+```
+
+When a model fails, Pi automatically tries the next entry in the `fallbacks` list. No manual intervention required.
+
+## Selecting a Model in Session
+
+Switch models interactively from inside a GSD session:
+
+```text
+/model
+```
+
+This opens a model picker showing all models from your configured providers. Select a model to switch immediately for the current session. Preferences-file settings take effect on the next auto-mode dispatch.
+
+## Using Multiple Providers
+
+Pi can route different phases to different providers. Use the `provider/model` format to target a specific provider:
+
+```yaml
+models:
+  research: openrouter/deepseek/deepseek-r1
+  planning: claude-opus-4-6
+  execution: claude-sonnet-4-6
+  execution_simple: gpt-4o-mini
+```
+
+Or use the object form with an explicit `provider` field:
+
+```yaml
+models:
+  planning:
+    model: claude-opus-4-6
+    provider: bedrock
+    fallbacks:
+      - claude-opus-4-6
+```
+
+### Cross-Provider Routing
+
+When `cross_provider: true` is enabled in dynamic routing, Pi uses its built-in cost table to find the cheapest model at each tier across all configured providers. This can significantly reduce costs when you have multiple providers available.
+
+<Note>
+  Cross-provider routing requires each target provider to be configured with valid credentials. Pi will not attempt to use a provider that isn't set up.
+</Note>
+
+## Custom and Local Models
+
+For providers not built into Pi (Ollama, LM Studio, vLLM, SGLang, or any OpenAI-compatible endpoint), define them in `~/.gsd/agent/models.json`:
+
+```json
+{
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://localhost:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama",
+      "compat": {
+        "supportsDeveloperRole": false,
+        "supportsReasoningEffort": false
+      },
+      "models": [
+        { "id": "qwen2.5-coder:7b" },
+        { "id": "llama3.1:8b" }
+      ]
+    }
+  }
+}
+```
+
+The `models.json` file reloads each time you open `/model` — no restart required to pick up changes.
+
+Once defined, reference local models in your per-phase configuration the same way as any cloud model:
+
+```yaml
+models:
+  execution: qwen2.5-coder:7b
+  execution_simple: llama3.1:8b
+```

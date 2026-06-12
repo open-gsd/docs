@@ -1,0 +1,173 @@
+---
+title: "Record Browser Sessions and Export Evidence Bundles"
+sidebarTitle: "Recording"
+description: "Capture named recordings, export shareable evidence bundles with network HAR and screenshots, and generate Playwright regression tests."
+---
+
+GSD Browser treats every recorded session as a first-class audit artifact. A recording captures network traffic, annotated screenshots, and a full narration log — all packaged into a portable evidence bundle you can share, archive, or automatically convert into a Playwright regression test. This workflow is designed for flows that need to be reproduced, audited, or handed to a compliance team.
+
+## Start and Stop a Recording
+
+Begin a recording before you start the actions you want to capture:
+
+```bash
+gsd-browser record-start --name checkout-bug-2026-05
+```
+
+Perform your browser actions — through the CLI, MCP tools, or manual takeover in the live viewer. Then stop the recording:
+
+```bash
+gsd-browser record-stop
+```
+
+<Note>
+  In MCP mode, use `browser_record_start` and `browser_record_stop`. Recordings started during an active live viewer session are automatically enriched with human annotations and frame-level context.
+</Note>
+
+## List and Export Recordings
+
+List all saved recordings:
+
+```bash
+gsd-browser recordings
+```
+
+Export a completed recording into a self-contained, shareable bundle:
+
+```bash
+gsd-browser recording-export <id> --output ./evidence/
+```
+
+### What a Recording Bundle Contains
+
+<CardGroup cols={2}>
+  <Card title="HAR file" icon="network-wired">
+    A complete HTTP Archive of every network request and response made during the session, including headers and bodies.
+  </Card>
+  <Card title="Key screenshots" icon="camera">
+    Automatic screenshots captured at key interaction points, plus any manual screenshots taken during the session.
+  </Card>
+  <Card title="Narration log" icon="list-timeline">
+    A timestamped, annotated action timeline showing every step the agent (or human) took, with success/failure state.
+  </Card>
+  <Card title="Recording manifest" icon="file-lines">
+    A `manifest.json` documenting the recording metadata, redaction details, and state restoration hints.
+  </Card>
+</CardGroup>
+
+## Validate a Bundle
+
+Before sharing or archiving a bundle, validate it to confirm it is complete:
+
+```bash
+gsd-browser recording-validate ./evidence/checkout-bug-2026-05
+```
+
+The validator confirms the bundle manifest, redaction details, and state restoration hints are all present.
+
+## Generate a Playwright Test
+
+Turn any recording into a Playwright regression test from the action timeline automatically:
+
+```bash
+gsd-browser generate-test --name checkout-flow --output tests/checkout.spec.ts
+```
+
+<Warning>
+  Always review the generated test before committing it. The generator uses versioned refs (`@vN:eM`) as starting locators — replace them with stable Playwright locators (`getByRole`, `getByText`, etc.) and tune assertion strictness before running in CI. The generator embeds review comments directly in the output to guide you.
+</Warning>
+
+The generated test includes:
+
+- A `test.describe` block with step-by-step replay of every recorded action
+- DOM assertions per step (element counts, text content)
+- Screenshot reference comments for visual cross-checking
+
+## Take Screenshots and Save PDFs
+
+Capture the current page state at any point during a session:
+
+<CodeGroup>
+  ```bash Screenshot
+  gsd-browser screenshot --output page.png
+  ```
+
+  ```bash Full-page PDF
+  gsd-browser save-pdf --output page.pdf --format A4
+  ```
+</CodeGroup>
+
+Screenshots and PDFs can be included as supporting evidence alongside exported recording bundles.
+
+## Export Network Traffic
+
+Export all network requests captured during the session as a HAR file at any time:
+
+```bash
+gsd-browser har-export --filename session.har
+```
+
+## CI Integration
+
+Use exported bundles and generated tests in your CI pipeline:
+
+```yaml .github/workflows/regression.yml
+- name: Validate evidence bundle
+  run: gsd-browser recording-validate "$BUNDLE_DIR" --json
+
+- name: Run reviewed regression test
+  run: npx playwright test tests/checkout-regression.spec.ts --reporter=list
+```
+
+<Tip>
+  Store reviewed generated tests in your repository under `tests/e2e/`. Store exported bundles as CI artifacts for audit and replay. Re-record when major UI changes invalidate the existing test.
+</Tip>
+
+## Full Evidence Workflow
+
+<Steps>
+  <Step title="Start the recording">
+    ```bash
+    gsd-browser --session checkout record-start --name checkout-regression
+    ```
+  </Step>
+
+  <Step title="Perform the flow">
+    Run your browser actions via CLI, MCP, or manual takeover. Use `annotation-request` at key decision points to embed "why this step matters" notes in the narration log.
+
+    ```bash
+    gsd-browser --session checkout annotation-request "Confirm total before payment"
+    ```
+  </Step>
+
+  <Step title="Stop the recording">
+    ```bash
+    gsd-browser --session checkout record-stop
+    ```
+  </Step>
+
+  <Step title="List and export the bundle">
+    ```bash
+    gsd-browser recordings
+    gsd-browser recording-export <id> --output ./evidence/checkout-regression
+    ```
+  </Step>
+
+  <Step title="Validate">
+    ```bash
+    gsd-browser recording-validate ./evidence/checkout-regression
+    ```
+  </Step>
+
+  <Step title="Generate the regression test">
+    ```bash
+    gsd-browser generate-test \
+      --name checkout-regression \
+      --output tests/e2e/checkout.spec.ts
+    ```
+  </Step>
+
+  <Step title="Review, curate, and commit">
+    Open `tests/e2e/checkout.spec.ts`, replace ephemeral refs with stable locators, and run `npx playwright test` locally before committing.
+  </Step>
+</Steps>

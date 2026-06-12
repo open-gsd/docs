@@ -1,0 +1,133 @@
+---
+title: "Manage Login Credentials Securely with the Auth Vault"
+sidebarTitle: "Auth Vault"
+description: "Store encrypted credentials in the GSD Browser vault, automate login flows, save session state, and skip repeated logins across agent runs."
+---
+
+The GSD Browser authentication vault stores credentials in an encrypted format on disk, separate from your automation scripts and prompts. Instead of embedding usernames, passwords, or tokens in agent instructions or environment variables, you store them once with a vault key and reference them by profile name in every subsequent run. The vault also integrates with session state — log in once, save the authenticated browser context, and restore it instantly in later runs without repeating the login flow.
+
+## Store Credentials
+
+Add a credential entry to the vault using a logical profile name:
+
+```bash
+gsd-browser vault-save \
+  --profile myapp-login \
+  --url https://app.example.com/login \
+  --username user@example.com \
+  --password secret
+```
+
+Credentials are encrypted at rest in the GSD Browser config directory using the key defined by `GSD_BROWSER_VAULT_KEY`. Never pass raw credentials in agent prompts or CLI history — store them once here and reference the profile name everywhere else.
+
+<Warning>
+  Set `GSD_BROWSER_VAULT_KEY` to a strong, unique value before storing any credentials. If you lose the vault key, stored credentials cannot be recovered. For MCP clients, set the key in the `"env"` block of your MCP server configuration so the daemon always starts with the correct key.
+</Warning>
+
+## Log In Automatically
+
+Use a stored credential profile to navigate to the configured login page and complete the form automatically:
+
+```bash
+gsd-browser vault-login --profile myapp-login
+```
+
+The `vault-login` command navigates to the URL stored in the profile, finds the login form, fills the username and password fields with the stored values, and submits the form. No credentials appear in your shell history or process list.
+
+<Note>
+  In MCP mode, use the `browser_vault_login` tool with the same `profile` parameter. The `robust_login_flow` built-in prompt also integrates with the vault automatically.
+</Note>
+
+## Save and Restore Session State
+
+After a successful login, save the authenticated browser context so future runs can skip the login step entirely:
+
+<Steps>
+  <Step title="Log in">
+    ```bash
+    gsd-browser vault-login --profile myapp-login
+    ```
+  </Step>
+
+  <Step title="Verify you are logged in">
+    ```bash
+    gsd-browser assert --checks '[{"kind": "url_contains", "text": "/dashboard"}]'
+    ```
+  </Step>
+
+  <Step title="Save the session state">
+    ```bash
+    gsd-browser save-state --name myapp-authenticated
+    ```
+
+    GSD Browser writes a session state file (cookies, local storage, session storage) to the config directory.
+  </Step>
+
+  <Step title="Restore in future runs (skip login)">
+    ```bash
+    gsd-browser restore-state --name myapp-authenticated
+    gsd-browser navigate https://app.example.com/dashboard
+    ```
+
+    The browser context loads with the saved authentication state. The login page is bypassed entirely.
+  </Step>
+</Steps>
+
+<Tip>
+  Combine named sessions with session state for maximum efficiency. Use `--session myapp` so the restored state, action cache, and browser context all share the same isolated namespace across multiple automation runs.
+</Tip>
+
+## List Vault Profiles
+
+List all stored credential profiles (values are never shown):
+
+```bash
+gsd-browser vault-list
+```
+
+## Full Authenticated Automation Workflow
+
+<Steps>
+  <Step title="Store credentials once">
+    ```bash
+    gsd-browser vault-save \
+      --profile myapp-login \
+      --url https://app.example.com/login \
+      --username user@example.com \
+      --password secret
+    ```
+  </Step>
+
+  <Step title="Log in and save state">
+    ```bash
+    gsd-browser vault-login --profile myapp-login
+    gsd-browser wait-for --condition url_contains --value /dashboard
+    gsd-browser save-state --name myapp-authenticated
+    ```
+  </Step>
+
+  <Step title="Restore state in every subsequent run">
+    ```bash
+    gsd-browser restore-state --name myapp-authenticated
+    gsd-browser navigate https://app.example.com/dashboard
+    # Continue automation from the authenticated state
+    ```
+  </Step>
+</Steps>
+
+## Best Practices for AI Agents
+
+<CardGroup cols={2}>
+  <Card title="Never pass credentials in prompts" icon="shield-halved">
+    Store credentials with `vault-save` during initial setup. In all agent prompts and MCP calls, reference the vault profile name — the agent never sees the actual password.
+  </Card>
+  <Card title="Use restore-state to skip login" icon="bolt">
+    For repeated automation runs, restore a saved session instead of logging in each time. This is faster and eliminates the risk of triggering bot-detection on the login page.
+  </Card>
+  <Card title="Re-login when sessions expire" icon="rotate">
+    Session state has a finite lifetime. When `restore-state` followed by a navigate lands on the login page, repeat the `vault-login` → `save-state` cycle to refresh the stored state.
+  </Card>
+  <Card title="Validate redaction before sharing" icon="eye-slash">
+    Run `gsd-browser recording-validate` on any evidence bundle that was captured in an authenticated session. The validator confirms that cookies and tokens were stripped before export.
+  </Card>
+</CardGroup>

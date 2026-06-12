@@ -1,0 +1,125 @@
+---
+title: "GSD Pi Web Interface: Dashboard and Live Monitoring"
+sidebarTitle: "Web UI"
+description: "Launch GSD Pi's browser-based dashboard for project management, live session monitoring, file browsing, and preferences — all without the terminal UI."
+---
+
+GSD Pi includes a browser-based web interface that gives you a visual project dashboard alongside the terminal. Use it to monitor auto mode in real time, browse your knowledge base, edit preferences, manage multiple projects, and access a built-in terminal emulator — all from a standard web browser.
+
+## Launching the Web Interface
+
+Start the web interface from your terminal with the `--web` flag:
+
+```bash
+gsd --web
+```
+
+This starts a local web server and opens the GSD dashboard in your default browser. The URL (including port) is printed to the terminal on startup — typically `http://localhost:3000`.
+
+You can also pass an optional path to open GSD in a specific project directory:
+
+```bash
+gsd --web /path/to/my-project
+```
+
+### Starting and Stopping with the `web` Subcommand
+
+Use the `gsd web` subcommand to manage the web server independently of a GSD session:
+
+```bash
+gsd web          # Start the web server
+gsd web stop     # Stop a running web server
+```
+
+### Custom Host and Port
+
+Override the default bind address and port with CLI flags:
+
+```bash
+gsd --web --host 0.0.0.0 --port 8080
+```
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--host` | `localhost` | Bind address for the web server |
+| `--port` | `3000` | Port for the web server |
+| `--allowed-origins` | (none) | Comma-separated list of allowed CORS origins |
+
+<Warning>
+  Binding to `0.0.0.0` exposes the web UI on all network interfaces. Only do this on trusted networks or behind a firewall. The web server has no built-in authentication beyond the session token GSD generates at startup.
+</Warning>
+
+## What the Web UI Provides
+
+<CardGroup cols={2}>
+  <Card title="Terminal Emulator" icon="terminal">
+    A full xterm.js-powered terminal runs inside the browser. Start GSD sessions, run commands, and interact with the TUI without leaving the web interface.
+  </Card>
+  <Card title="Project Dashboard" icon="chart-bar">
+    A visual overview of milestones, slices, and tasks with progress indicators, dependency graphs, and status badges.
+  </Card>
+  <Card title="Live State Viewer" icon="bolt">
+    Server-sent events push real-time updates as auto mode executes. Watch tasks complete, costs accumulate, and milestone progress advance without refreshing the page.
+  </Card>
+  <Card title="Session Management" icon="list">
+    Switch between active sessions, view session history, and resume a previous session — all from the browser sidebar.
+  </Card>
+  <Card title="Knowledge Browser" icon="book">
+    Browse your project's knowledge base including `KNOWLEDGE.md` rules, patterns, lessons, and architectural decisions stored in `DECISIONS.md`.
+  </Card>
+  <Card title="Preferences Editor" icon="sliders">
+    Edit global and project-level preferences through a guided web form — no need to manually edit YAML frontmatter in `PREFERENCES.md`.
+  </Card>
+  <Card title="File Browser" icon="folder-open">
+    Navigate the project directory and `.gsd/` artifact files directly from the browser, with syntax-highlighted viewing.
+  </Card>
+  <Card title="Cost Tracking" icon="dollar-sign">
+    Live cost panels show per-session and per-milestone spending, token usage, and projections based on current burn rate.
+  </Card>
+</CardGroup>
+
+## Multi-Project Support
+
+The web UI supports multiple projects from a single browser tab. Switch between projects using the `?project=` URL parameter:
+
+```
+http://localhost:3000?project=/path/to/other-project
+```
+
+You can also change the active project root from within the web UI without restarting the server.
+
+Set `GSD_WEB_PROJECT_CWD` as an environment variable to specify the default project when `?project=` is not in the URL:
+
+```bash
+GSD_WEB_PROJECT_CWD=/path/to/my-project gsd --web
+```
+
+## Notification History
+
+The web UI tracks all notifications GSD sends during a session — milestone completions, budget alerts, blockers, and attention requests — in a persistent notification panel. Click any notification to jump to the relevant part of the dashboard.
+
+## Platform Notes
+
+<Info>
+  The GSD Pi web interface is supported on **macOS** and **Linux**. The web build is skipped on Windows due to Next.js webpack compatibility issues with certain system directories. The GSD CLI and TUI remain fully functional on Windows.
+</Info>
+
+## MCP and API Routes
+
+The web server exposes a rich set of API routes that power the dashboard. These routes are also available for integrations and tooling:
+
+| Route | Description |
+|-------|-------------|
+| `/api/live-state` | SSE stream of live session state |
+| `/api/projects` | List and switch projects |
+| `/api/preferences` | Read and write preferences |
+| `/api/knowledge` | Browse the knowledge base |
+| `/api/session` | Session management |
+| `/api/git` | Git status and worktree info |
+| `/api/notifications` | Notification history |
+| `/api/history` | Execution history |
+| `/api/terminal` | Terminal bridge for xterm.js |
+
+<Tip>
+  You can use the `/api/live-state` SSE endpoint to build your own dashboard integrations — pipe the event stream to monitoring tools, Slack webhooks, or any system that can consume server-sent events.
+</Tip>

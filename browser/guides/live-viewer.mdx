@@ -1,0 +1,164 @@
+---
+title: "Watch and Control the Browser Live with GSD Viewer"
+sidebarTitle: "Live Viewer"
+description: "Watch the agent live, pause and step through actions, take manual control, annotate moments, and share the viewer URL with your team."
+---
+
+The GSD Browser live viewer gives you — and any collaborator — a real-time window into exactly what the agent's browser is doing. You can watch passively, pause and step through actions one at a time, take manual control of the keyboard and mouse, annotate key moments, and hand control back to the agent without breaking the session. Every action the agent takes is narrated in a scrollable history panel alongside the live frame.
+
+## Start the Viewer
+
+<Steps>
+  <Step title="Begin a named session">
+    Use `--session` so every command in the flow attaches to the same browser context, viewer, and history.
+
+    ```bash
+    gsd-browser --session demo navigate https://example.com
+    ```
+  </Step>
+
+  <Step title="Open the viewer">
+    ```bash
+    gsd-browser --session demo view
+    ```
+
+    GSD Browser prints a localhost URL (e.g. `http://127.0.0.1:7878/viewer?token=...`) and opens it in your default browser. The URL includes a one-time security token — share it only with collaborators who should have access.
+
+    If you need the URL without auto-opening (for example, to pass it to another tool):
+
+    ```bash
+    VIEW_URL=$(gsd-browser --session demo view --print-only | tail -1)
+    echo "$VIEW_URL"
+    ```
+  </Step>
+
+  <Step title="Set a goal banner (optional)">
+    Display a visible goal message so collaborators understand what the agent is doing:
+
+    ```bash
+    gsd-browser --session demo goal "Complete the checkout flow"
+    ```
+
+    Clear it when the step is done:
+
+    ```bash
+    gsd-browser --session demo goal --clear
+    ```
+  </Step>
+
+  <Step title="Drive actions normally">
+    Keep issuing CLI or MCP commands. The viewer reflects every action in real time — clicks, typing, navigation, and failures all appear with target rings, cursor animations, and narration entries.
+
+    ```bash
+    gsd-browser --session demo snapshot
+    gsd-browser --session demo click-ref @v1:e3
+    gsd-browser --session demo fill-ref @v1:e1 "user@example.com"
+    gsd-browser --session demo act --intent submit_form
+    ```
+  </Step>
+
+  <Step title="Stop the session when done">
+    Stop the daemon when no further browser work is needed:
+
+    ```bash
+    gsd-browser --session demo daemon stop
+    ```
+  </Step>
+</Steps>
+
+## Viewer Controls
+
+The viewer exposes controls directly in the browser UI. You can also use keyboard shortcuts.
+
+| Control | Keyboard Shortcut | Effect |
+|---------|-------------------|--------|
+| Pause | `Space` | Blocks the agent before its next narrated action |
+| Resume | `Space` | Allows agent actions to continue |
+| Step | `→` (Right Arrow) | Allows exactly one action, then returns to paused |
+| Abort | `Esc` | Aborts the next queued action |
+| Refs overlay | `R` | Shows or hides bounding boxes and labels for interactive elements |
+
+## Human Takeover
+
+Take full manual control of the browser without terminating the session:
+
+<Steps>
+  <Step title="Click Take Control in the viewer UI">
+    The agent pauses immediately. The session remains live — cookies, auth state, and page context are all preserved.
+  </Step>
+  <Step title="Interact manually">
+    Use your mouse and keyboard in the viewer to click, type, scroll, or navigate. All manual actions are captured in the narration history.
+  </Step>
+  <Step title="Click Resume Agent to hand back">
+    The agent picks up from the exact page state you left it in. It re-snapshots automatically before its next action.
+  </Step>
+</Steps>
+
+<Note>
+  In MCP mode, use `browser_takeover` to pause and `browser_release_control` to hand back programmatically.
+</Note>
+
+## Annotation Tools
+
+Mark important moments directly in the viewer so they appear in the narration log and any exported evidence bundle.
+
+<CardGroup cols={2}>
+  <Card title="Draw overlays" icon="pen">
+    Highlight regions of the page with freehand drawing to call attention to specific elements.
+  </Card>
+  <Card title="Add notes" icon="note-sticky">
+    Attach text annotations to the current frame — these become timestamped entries in the narration history.
+  </Card>
+  <Card title="Mark elements for the agent" icon="crosshairs">
+    Flag elements in the viewer so the agent's next snapshot includes a prioritized hint for that region.
+  </Card>
+  <Card title="Narration history" icon="list-check">
+    Every annotation streams to the MCP server and appears in the narration log. Retrieve the full log at any time.
+  </Card>
+</CardGroup>
+
+Request an annotation from the CLI — a prompt appears in the viewer for the human collaborator to fill in:
+
+```bash
+gsd-browser --session demo annotation-request "Please confirm the price shown here"
+```
+
+## Review History
+
+Open a history-focused view without issuing new browser actions:
+
+```bash
+gsd-browser --session demo view --history
+```
+
+History items show pending, success, and failure states. Hover an entry in the viewer to preview the captured frame around that action.
+
+## Fast Agent Runs
+
+For agent-only runs where no human needs the cursor lead-in animation, use `--no-narration-delay`. The narration history is still recorded — only the lead-time sleep is skipped.
+
+```bash
+gsd-browser --session demo --no-narration-delay navigate https://example.com
+gsd-browser --session demo --no-narration-delay click-ref @v1:e2
+```
+
+## When to Use the Live Viewer
+
+<CardGroup cols={2}>
+  <Card title="Compliance review" icon="shield-check">
+    Let a compliance officer watch the agent complete a regulated workflow and annotate the key attestation steps in real time.
+  </Card>
+  <Card title="Debugging" icon="bug">
+    Pause and step through a failing flow action-by-action to pinpoint exactly where the agent goes wrong.
+  </Card>
+  <Card title="Training data collection" icon="database">
+    Record the viewer session — including manual takeovers and annotations — as a rich, labeled training dataset.
+  </Card>
+  <Card title="User acceptance testing" icon="user-check">
+    Let a QA engineer watch the agent run a user story and intervene at any point to verify or correct behavior.
+  </Card>
+</CardGroup>
+
+<Tip>
+  Recordings started during an active viewer session produce the highest-quality evidence bundles because they capture both agent actions and human annotations in a single enriched timeline. Start a recording with `gsd-browser --session demo record-start --name my-flow` before your viewer session for the richest output.
+</Tip>

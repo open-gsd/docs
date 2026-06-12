@@ -1,0 +1,127 @@
+---
+title: "GSD Pi Project Structure and .gsd/ Directory Layout"
+sidebarTitle: "Project Structure"
+description: "Learn how GSD Pi organizes project state in .gsd/ — the SQLite database, markdown projections, and the Milestone → Slice → Task hierarchy."
+---
+
+When GSD Pi initializes in a project, it creates a `.gsd/` directory at the project root. This directory is the single source of truth for everything Pi knows about your project: plans, progress, decisions, codebase knowledge, task summaries, and runtime state. Understanding what lives there helps you read Pi's output, steer the work, and recover if something goes wrong.
+
+## The Source of Truth: `gsd.db`
+
+Pi's runtime state lives in a SQLite database at `.gsd/gsd.db`. The database records every milestone, slice, task, requirement, decision, pattern, lesson, summary, and completion event. It runs in WAL mode for safe concurrent access across multiple processes on the same machine.
+
+<Note>
+  The database is authoritative. Markdown files in `.gsd/` are **projections** — they render the database contents into human-readable form for review, context injection into prompts, and git-friendly history. Editing a markdown file does not change the database unless you explicitly import the change through Pi (for example, with `/gsd migrate` or a dedicated import command).
+</Note>
+
+## Markdown Projections
+
+Pi generates and maintains the following key markdown files in `.gsd/`. These files are your primary window into what Pi is doing and what it knows:
+
+<AccordionGroup>
+  <Accordion title="STATE.md — Current Project State">
+    `STATE.md` reflects the live project state: the active milestone, current slice, active task, and overall progress. Pi regenerates it after every unit transition. Read it to quickly orient yourself when you return to a session.
+  </Accordion>
+  <Accordion title="DECISIONS.md — Architectural Decisions">
+    `DECISIONS.md` is a register of architectural and implementation decisions Pi has recorded or that you've explicitly added. Each entry captures what was decided, why, and any constraints it imposes on future work.
+
+    Editing `DECISIONS.md` directly does not write to the database — use `/gsd knowledge` or let Pi record decisions naturally during planning.
+  </Accordion>
+  <Accordion title="CODEBASE.md — Codebase Understanding">
+    `CODEBASE.md` is Pi's synthesized map of the codebase: key modules, entry points, data flows, conventions, and dependencies. Pi writes it on first run and refreshes it with `/gsd codebase update`. It is injected into task prompts to give Pi codebase context without re-reading every file on every turn.
+  </Accordion>
+  <Accordion title="KNOWLEDGE.md — Patterns and Rules">
+    `KNOWLEDGE.md` records accumulated project knowledge in three sections:
+    - **Rules** — manually authored operating rules that Pi always respects (file-canonical)
+    - **Patterns** — recurring patterns Pi has observed and stored as memories
+    - **Lessons** — gotchas and lessons learned from previous work, also memory-backed
+
+    Rules are file-canonical: edit `KNOWLEDGE.md` directly to add or change them. Patterns and Lessons are backed by the `memories` table and projected into the file on session start.
+  </Accordion>
+  <Accordion title="PREFERENCES.md — Project Configuration">
+    `.gsd/PREFERENCES.md` holds project-level configuration in YAML frontmatter: model preferences, planning depth, budget ceiling, verification commands, timeout settings, git behavior, and more. This file is the primary way you tune Pi's behavior for a specific project.
+  </Accordion>
+  <Accordion title="REQUIREMENTS.md — Capability Contract">
+    Generated during deep planning mode, `REQUIREMENTS.md` records the agreed capability contract using `R###` requirement identifiers grouped by status: Active, Validated, Deferred, and Out of Scope.
+  </Accordion>
+</AccordionGroup>
+
+## The Milestone → Slice → Task Hierarchy
+
+Pi decomposes all work into three levels. Understanding this hierarchy helps you read the planning artifacts and interpret Pi's progress:
+
+<Steps>
+  <Step title="Milestones">
+    A milestone is a **shippable increment** — a coherent body of work that moves the project meaningfully forward and can be reviewed and merged as a unit. Each milestone gets a roadmap (`M###-ROADMAP.md`) that defines the slices, success criteria, and completion conditions.
+
+    Milestones are isolated in git worktrees (when `git.isolation: worktree` is configured) and squash-merged to the main branch when complete.
+  </Step>
+  <Step title="Slices">
+    A slice is a **coherent unit of work within a milestone** — a group of related tasks that form a logical step toward the milestone goal. Slices are planned, executed, and completed as a unit. Each slice gets a plan (`S##-PLAN.md`) that describes the slice goal and lists the tasks with their expected inputs and outputs.
+
+    Slices progress through phases: plan → research (optional) → execute tasks → complete → run UAT → reassess roadmap.
+  </Step>
+  <Step title="Tasks">
+    A task is an **atomic implementation unit** — a single, focused change that one agent session can complete and commit. Each task gets a plan embedded in the slice plan, and a summary (`T##-SUMMARY.md`) once it completes. Task summaries flow into the next task's context, so later tasks know what earlier tasks built.
+  </Step>
+</Steps>
+
+## Directory Layout
+
+A project after a milestone completes looks like this. Note that worktrees live in `.gsd-worktrees/` — a sibling of `.gsd/` at the project root — not inside `.gsd/` itself:
+
+```text
+<projectRoot>/
+├── .gsd-worktrees/                 # Canonical location for milestone worktrees
+│   └── M001/                       # Git worktree for milestone isolation
+└── .gsd/
+    ├── gsd.db                      # Runtime SQLite database (source of truth)
+    ├── STATE.md                    # Current milestone / slice / task state
+    ├── DECISIONS.md                # Architectural decisions register
+    ├── CODEBASE.md                 # Synthesized codebase map
+    ├── KNOWLEDGE.md                # Rules, patterns, and lessons
+    ├── PREFERENCES.md              # Project-level configuration
+    ├── REQUIREMENTS.md             # Capability contract (deep mode)
+    │
+    ├── milestones/
+    │   └── M001/
+    │       ├── M001-ROADMAP.md     # Milestone roadmap with slice list and success criteria
+    │       ├── M001-CONTEXT.md     # Milestone-specific codebase context
+    │       ├── M001-SUMMARY.md     # Milestone completion summary
+    │       ├── S01-PLAN.md         # Slice plan with task definitions
+    │       ├── S01-ASSESSMENT.md   # UAT verdict for this slice
+    │       ├── T01-SUMMARY.md      # Task completion summary
+    │       └── T02-SUMMARY.md
+    │
+    ├── research/
+    │   ├── STACK.md                # Technology stack research (deep mode)
+    │   ├── FEATURES.md             # Feature norms research
+    │   ├── ARCHITECTURE.md         # Architecture patterns research
+    │   └── PITFALLS.md             # Known pitfalls research
+    │
+    ├── reports/
+    │   └── M001-report.html        # Self-contained HTML milestone report
+    │
+    ├── exec/                       # Sandboxed command output (capped stdout/stderr)
+    ├── runtime/                    # Active runtime state and markers
+    └── journal/                    # Structured event log for each auto-mode iteration
+```
+
+<Note>
+  Worktrees created under the legacy `.gsd/worktrees/<MID>/` location keep working — resolution, listing, merge, and teardown still recognize that path. Only newly created worktrees use the canonical `.gsd-worktrees/` location, so you can upgrade mid-milestone without moving any files.
+</Note>
+
+## Committing `.gsd/` to Git
+
+Pi commits planning artifacts to git by default (`git.commit_docs: true`). This gives you a reviewable history of how plans evolved, what decisions were made, and how the milestone progressed. Runtime files like `gsd.db`, exec output, and the `.gsd-worktrees/` directory are automatically added to `.gitignore`.
+
+If you prefer to keep all `.gsd/` content local and out of git, set:
+
+```yaml
+git:
+  commit_docs: false
+```
+
+<Tip>
+  Committing the milestone roadmaps, slice plans, and task summaries to git is useful for code review — reviewers can read the planning artifacts alongside the code changes to understand the intent behind each commit.
+</Tip>

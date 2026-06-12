@@ -1,0 +1,75 @@
+---
+title: "GSD Browser: AI-Powered Browser Automation CLI"
+sidebarTitle: "Introduction"
+description: "GSD Browser is a native Rust CLI for Chrome/Chromium automation via CDP. Persistent daemon, 90+ commands, and 50+ MCP tools for AI agent integration."
+---
+
+GSD Browser is a native Rust browser automation CLI that drives Chrome and Chromium through the Chrome DevTools Protocol (CDP). Unlike script-based frameworks, it runs a persistent background daemon that owns the full browser lifecycle — page routing, network hooks, action timeline, and session state — while a thin CLI client sends it commands. AI agents connect through the MCP server mode (`gsd-browser mcp`), which exposes over 50 discoverable tools, live resources, and executable prompts to any MCP-compatible client.
+
+## What makes GSD Browser different
+
+GSD Browser is designed for serious, auditable, human-collaborative agentic web work. Several capabilities set it apart from conventional browser automation tools.
+
+<CardGroup cols={2}>
+  <Card title="Versioned element refs" icon="fingerprint">
+    `gsd-browser snapshot` scans the page and assigns stable refs like `@v1:e1`. Refs are version-stamped and stale-safe — old refs from a previous snapshot are automatically rejected when the DOM changes.
+  </Card>
+  <Card title="Live authenticated viewer" icon="eye">
+    `gsd-browser view` opens a real-time localhost workbench so humans can watch, annotate, take over control, pause, step through actions, and resume — without interrupting the agent loop.
+  </Card>
+  <Card title="Session recording & evidence bundles" icon="film">
+    Record any flow as a rich, redacted evidence bundle. Bundles auto-convert to commit-ready Playwright regression tests via `browser_generate_replayable_test`.
+  </Card>
+  <Card title="Semantic intents" icon="wand-magic-sparkles">
+    `browser_act` and `find_best` cover 15 built-in intent patterns — fill email, submit form, accept cookies, paginate, and more — so agents express *what* to do, not *how*.
+  </Card>
+  <Card title="Action cache & self-healing" icon="rotate">
+    Successful intent-to-selector mappings persist in a per-session cache. Future runs reuse them automatically, making long-running agent projects progressively more reliable.
+  </Card>
+  <Card title="Encrypted credential vault" icon="lock">
+    `gsd-browser vault-save` stores credentials encrypted on disk. `browser_vault_login` replays them without ever exposing raw secrets in prompts or logs.
+  </Card>
+  <Card title="Network control" icon="network-wired">
+    Mock routes, block URLs, export HAR files, and start CDP traces — all in the same tool, with no separate proxy or plugin required.
+  </Card>
+  <Card title="50+ MCP tools for agents" icon="robot">
+    `gsd-browser mcp` exposes the entire daemon surface as MCP tools, resources, and executable prompts. Connect Cursor, Claude Desktop, VS Code Copilot, or any MCP client instantly.
+  </Card>
+</CardGroup>
+
+## Architecture overview
+
+The daemon starts automatically the first time you run any browser command. It maintains an open Chrome instance, tracks page targets, buffers console and network logs, manages named sessions, and serves all commands over a local loopback HTTP channel. The CLI and the MCP server both talk to the same daemon — they share identical semantics and reliability guarantees.
+
+```
+┌─────────────────┐     JSON-RPC      ┌──────────────────────┐
+│  gsd-browser    │ ◄────────────────► │   daemon (localhost)  │
+│  CLI / MCP      │                   │   browser lifecycle   │
+└─────────────────┘                   │   page routing        │
+                                       │   session state       │
+                                       └──────────────────────┘
+                                                │ CDP
+                                       ┌────────▼─────────┐
+                                       │  Chrome / Chromium │
+                                       └──────────────────┘
+```
+
+<Note>
+The daemon starts automatically on the first browser command. You rarely need to manage it manually. Use `gsd-browser daemon health` to inspect its state without triggering a start.
+</Note>
+
+## Primary paths
+
+Choose the path that fits your workflow:
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/browser/installation">
+    Install via npm, one-line script, pre-built binary, or build from source.
+  </Card>
+  <Card title="Quickstart" icon="play" href="/browser/quickstart">
+    Start the daemon, navigate a page, take a snapshot, and interact with elements in minutes.
+  </Card>
+  <Card title="MCP Server" icon="plug" href="/browser/concepts/mcp-server">
+    Connect any MCP-compatible AI agent to the full GSD Browser surface in one command.
+  </Card>
+</CardGroup>

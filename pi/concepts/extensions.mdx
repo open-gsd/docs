@@ -1,0 +1,153 @@
+---
+title: "GSD Pi Extension System: Bundled and Community Extensions"
+sidebarTitle: "Extensions"
+description: "GSD Pi's extension system adds capabilities through three tiers: non-disableable core, default-enabled bundled, and user-installed community extensions."
+---
+
+GSD Pi's capabilities expand through a layered extension system. Extensions add tools, slash commands, UI integrations, and provider connections to Pi. You can enable or disable most extensions per project, install community extensions from npm, and build your own using the extension SDK.
+
+## Extension Tiers
+
+Extensions are grouped into three tiers based on their role and configurability:
+
+<CardGroup cols={3}>
+  <Card title="Core" icon="lock">
+    System extensions that are always active. They provide fundamental runtime capabilities that Pi depends on and cannot be disabled.
+  </Card>
+  <Card title="Bundled" icon="box">
+    Packaged with Pi and enabled by default. You can toggle these on or off per project using `/gsd extensions enable` and `/gsd extensions disable`.
+  </Card>
+  <Card title="Community" icon="puzzle-piece">
+    User-installed extensions from npm, a git URL, or a local path. Install them with `gsd install` or `/gsd extensions install`.
+  </Card>
+</CardGroup>
+
+## Bundled Extensions
+
+These extensions ship with GSD Pi and are enabled by default. Toggle any of them with `/gsd extensions enable <id>` or `/gsd extensions disable <id>`.
+
+<AccordionGroup>
+  <Accordion title="browser-tools — Browser Automation">
+    Provides a canonical `browser_*` tool surface that Pi uses to open pages, interact with UI elements, take screenshots, run visual diffs, and record sessions. Used during browser-based UAT, E2E flows, and visual verification.
+
+    **Engine selection.** For browser-facing (web-app) projects, Pi prefers the managed [GSD Browser](/browser/introduction) engine when its CLI is available and the daemon connects at session start. If the connect probe fails or the CLI is missing, Pi falls back to legacy Playwright for that session and records the reason. Non-browser-facing projects stay on Playwright — browser tools are incidental there and the managed daemon's startup cost isn't worth it.
+
+    The session-start connect probe has a 10-second budget. Falling back to Playwright preserves browser-based UAT instead of blocking the run; the engine actually registered is what later UAT guidance and re-warm-ups see.
+
+    **Overrides.** Set these in your shell or your provider environment to force a specific engine or tune startup:
+
+    | Variable | Values | Effect |
+    |----------|--------|--------|
+    | `GSD_BROWSER_ENGINE` | `gsd-browser` | Force the managed GSD Browser engine. No probe, no fallback. |
+    | `GSD_BROWSER_ENGINE` | `playwright` (alias: `legacy`) | Force legacy Playwright, even on web-app projects. |
+    | `GSD_BROWSER_ENGINE` | `off` | Disable Pi browser tools entirely. |
+    | `GSD_BROWSER_WARMUP` | `0` | Skip eager warm-up. Without warm-up the connect probe can't verify the managed engine, so the default resolves to Playwright; the managed engine still works if you set `GSD_BROWSER_ENGINE=gsd-browser` explicitly. |
+
+    **UAT modes.** Pi UAT specs labeled `browser-executable`, `live-runtime`, `mixed`, or `human-experience` always run against whichever engine is registered for the session — the canonical `browser_*` contract is engine-stable, so prompts and policies don't change with the engine. UAT specs that drive Playwright directly from a shell command should be declared `runtime-executable` so they record runtime evidence instead of browser evidence.
+
+    **External MCP clients.** `gsd-browser` also ships as a standalone MCP server for external clients (Claude Desktop, Cursor, custom harnesses). Write the entry with `/gsd mcp init`. Setting `GSD_BROWSER_MCP_ENABLED=0` only skips writing that external entry — it does not disable Pi's own browser tools.
+  </Accordion>
+  <Accordion title="async-jobs — Background Task Execution">
+    Enables background async task execution. Pi can dispatch long-running jobs and poll for results without blocking the main agent context. Useful for CI waits, build pipelines, and external API workflows.
+  </Accordion>
+  <Accordion title="bg-shell — Background Shell Processes">
+    Allows Pi to start and manage background shell processes — dev servers, watchers, and long-running build processes — and interact with their output across turns. Access the background shell panel with **Ctrl+Alt+B**.
+  </Accordion>
+  <Accordion title="search-the-web — Web Search Tools">
+    Gives Pi the ability to search the web for documentation, library references, API specs, and error resolutions. Powered by Brave Search and Jina Reader. Configure a Brave API key with `/gsd config` to use your own quota.
+  </Accordion>
+  <Accordion title="subagent — Subagent Spawning">
+    Enables Pi to delegate isolated units of work to subagents — specialist agents (scout, researcher, reviewer, security, tester) that run in their own context windows and report back. Used extensively during parallel task execution and deep planning phases.
+  </Accordion>
+  <Accordion title="voice — Voice Transcription">
+    Adds real-time speech-to-text input. Press **Ctrl+Alt+V** to toggle voice transcription on or off. Supported on macOS and Linux. Transcribed text appears in the input field as you speak.
+  </Accordion>
+  <Accordion title="visual-brief — Visual Context Capture">
+    Enables Pi to capture visual context — screenshots, clipboard images, and screen regions — and include them as vision input in prompts. Paste a screenshot with **Ctrl+V** or **Alt+V** to give Pi visual context about a UI, error, or design.
+  </Accordion>
+  <Accordion title="context7 — Library Documentation Lookup">
+    Integrates Context7 for accurate, version-specific library documentation lookup. Pi uses this during research and planning phases to fetch up-to-date API references instead of relying on training data. Works out of the box; optionally set `CONTEXT7_API_KEY` for higher rate limits.
+  </Accordion>
+  <Accordion title="mac-tools — macOS Accessibility Automation">
+    Provides macOS UI automation via the Accessibility API — Pi can list running apps, capture screenshots, inspect the UI tree, click elements, and type text. Active on macOS only.
+  </Accordion>
+  <Accordion title="remote-questions — Remote Question Routing">
+    Routes Pi's interactive questions to remote messaging adapters (Slack, Discord, Telegram) when running unattended. Lets you answer Pi's prompts from your phone or chat app during overnight autonomous runs.
+  </Accordion>
+  <Accordion title="universal-config — AI Tool Config Discovery">
+    Discovers AI coding tool configurations from Claude Code, Cursor, Windsurf, Gemini CLI, and other tools present in the project. Pi can import or reference existing tool configs when setting up a new session.
+  </Accordion>
+  <Accordion title="slash-commands — Extension and Command Scaffolding">
+    Provides scaffolding commands for building new slash commands and extensions: `/gsd create-slash-command`, `/gsd create-extension`, and `/gsd audit`. Useful when you want to extend Pi's capabilities for your team.
+  </Accordion>
+  <Accordion title="ttsr — Streaming Output Guardrails">
+    Monitors Pi's streaming output against configurable regex patterns at zero context cost. Catches unwanted patterns in real time — useful for enforcing output conventions or blocking sensitive data from appearing in responses.
+  </Accordion>
+</AccordionGroup>
+
+## Managing Extensions
+
+Inspect and control extensions from inside a GSD session:
+
+| Command | What it does |
+|---------|-------------|
+| `/gsd extensions list` | List all extensions with their status (`enabled`, `disabled`, `[user]` for installed) |
+| `/gsd extensions enable <id>` | Enable a disabled bundled extension |
+| `/gsd extensions disable <id>` | Disable a bundled extension |
+| `/gsd extensions info <id>` | Show extension details, capabilities, and configuration |
+| `/gsd extensions install <spec>` | Install a community extension from npm, a git URL, or a local path |
+| `/gsd extensions uninstall <id>` | Remove a user-installed extension |
+| `/gsd extensions update [id]` | Update a user-installed npm extension to its latest version |
+| `/gsd extensions validate <path>` | Validate an extension directory against the manifest schema |
+
+## Installing Community Extensions
+
+Install community extensions from npm using the `gsd install` command from your shell:
+
+```bash
+gsd install <package-name>
+```
+
+Or from inside a GSD session:
+
+```text
+/gsd extensions install <package-name>
+```
+
+Install sources are detected automatically:
+
+- Starts with `https://` or ends with `.git` → cloned from git
+- Contains `/` or `.` and exists on disk → copied from local path
+- Otherwise → fetched from npm
+
+Installed extensions land in `~/.gsd/extensions/<id>/` and are available across all projects. Restart GSD after installation to activate a new extension.
+
+### Example: Installing a Community Provider Extension
+
+```bash
+gsd install npm:pi-dashscope
+```
+
+This installs the `pi-dashscope` community extension, which adds Alibaba DashScope (ModelStudio) provider support with Qwen3, GLM-5, and other models — with proper OpenAI-compatible endpoint configuration and thinking mode support.
+
+<Warning>
+  Uninstalling an extension warns you if other extensions depend on it. Review dependencies with `/gsd extensions info <id>` before uninstalling.
+</Warning>
+
+## Building Your Own Extension
+
+Extensions are npm packages that implement the GSD extension SDK. An extension can contribute:
+
+- **Tools** — new tools available to Pi during agent sessions
+- **Slash commands** — new `/gsd` commands for the TUI
+- **UI components** — dashboard widgets and visualizer tabs
+- **Provider integrations** — new LLM providers or model configurations
+- **Hooks** — event handlers that fire on auto-mode events
+
+Validate your extension before publishing:
+
+```bash
+gsd extensions validate ./my-extension
+```
+
+See the Extension SDK documentation for the full manifest specification, API reference, and testing guide.

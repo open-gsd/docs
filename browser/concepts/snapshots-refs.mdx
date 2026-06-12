@@ -1,0 +1,155 @@
+---
+title: "Snapshots & Versioned Element Refs in GSD Browser"
+sidebarTitle: "Snapshots & Refs"
+description: "Learn how gsd-browser snapshot assigns versioned refs like @v1:e1, why they are stale-safe, which snapshot modes exist, and how the action cache works."
+---
+
+Versioned element refs are GSD Browser's core mechanism for reliable, deterministic browser interaction. Rather than asking you to write CSS selectors or XPath expressions that silently break when the DOM changes, GSD Browser scans the live page, assigns each interactive element a stable ref, and version-stamps the entire set. Any interaction command that uses a ref from an older snapshot version is automatically rejected — you always know when you are working with fresh data.
+
+## How a snapshot works
+
+Run `gsd-browser snapshot` on any loaded page. The daemon traverses the live DOM, identifies interactive and semantically meaningful elements, and assigns each one a ref in the format `@vN:eM` — where `N` is the snapshot version number and `M` is the element index within that snapshot.
+
+```bash
+gsd-browser snapshot
+```
+
+Example output on `https://example.com`:
+
+```
+@v1:e1  [a]       "More information..." (href="/more")
+```
+
+After you navigate or the page changes, take a new snapshot:
+
+```bash
+gsd-browser navigate https://example.com/search
+gsd-browser snapshot
+```
+
+The version counter increments — every ref from this snapshot starts with `@v2:`:
+
+```
+@v2:e1  [input]   type="search" placeholder="Find docs..."
+@v2:e2  [button]  "Search"
+@v2:e3  [a]       "Advanced search"
+```
+
+Passing `@v1:e1` to a command after taking snapshot v2 raises a stale-ref error immediately, before any interaction reaches Chrome. This fail-fast behaviour prevents the subtle wrong-element bugs that plague selector-based automation.
+
+<Warning>
+  Always take a fresh snapshot after navigation, form submission, dialog interactions, or any other action that changes the page structure. Old refs do not automatically refresh — they become stale and will be rejected.
+</Warning>
+
+## Snapshot modes
+
+The default snapshot captures interactive elements only. Pass `--mode` to focus on a specific semantic category:
+
+| Mode | What it captures |
+|---|---|
+| `interactive` (default) | Buttons, links, inputs, selects, and other actionable elements |
+| `form` | All form fields, labels, and submit controls |
+| `dialog` | Elements inside open dialogs and modals |
+| `navigation` | Nav links, breadcrumbs, and pagination controls |
+| `errors` | Visible error messages, validation feedback, and alerts |
+| `headings` | Page headings (h1–h6) for structural orientation |
+| `visible_only` | Every visible element, not limited to interactive ones |
+
+```bash
+# Capture only form fields on a checkout page
+gsd-browser snapshot --mode form
+
+# Capture everything visible for a full-page audit
+gsd-browser snapshot --mode visible_only
+```
+
+You can also scope a snapshot to a part of the page with `--selector`:
+
+```bash
+gsd-browser snapshot --selector "#main-content"
+```
+
+## Interacting with refs
+
+All interaction commands accept either a ref or a CSS selector. Use refs whenever you have a current snapshot — they are more robust than selectors because the daemon validates the version stamp before acting.
+
+<CodeGroup>
+  ```bash Click
+  gsd-browser click @v2:e2
+  # or by selector
+  gsd-browser click "button[type='submit']"
+  ```
+
+  ```bash Type / Fill
+  gsd-browser type @v2:e1 "search query"
+  gsd-browser fill-ref @v2:e1 "search query" --clear-first
+  ```
+
+  ```bash Hover
+  gsd-browser hover-ref @v2:e3
+  ```
+</CodeGroup>
+
+## Inspecting a specific ref
+
+`gsd-browser get-ref` returns full metadata for any ref — bounding box, ARIA role and name, element tag, structural signature, and the resolved CSS selector the daemon uses internally:
+
+```bash
+gsd-browser get-ref @v2:e1
+```
+
+```json
+{
+  "ref": "@v2:e1",
+  "tag": "input",
+  "type": "search",
+  "aria_role": "searchbox",
+  "aria_label": "Find docs...",
+  "placeholder": "Find docs...",
+  "bounding_box": { "x": 120, "y": 80, "width": 400, "height": 40 },
+  "selector": "#search-input"
+}
+```
+
+This is particularly useful when debugging why an interaction failed or when you want to understand the structural context of an element.
+
+## Best practices for AI agents
+
+<Steps>
+  <Step title="Always snapshot before interacting">
+    Read the `gsd-browser://latest-snapshot` MCP resource (or call `browser_snapshot`) after every navigation and after any action that changes the DOM. This gives your agent fresh, versioned refs before it attempts any interaction.
+  </Step>
+
+  <Step title="Prefer semantic tools first">
+    Use `browser_act` or `browser_find_best` for common intents (fill email, click submit, accept cookies, etc.) before dropping down to ref-based interaction. Semantic tools use the action cache automatically and are more resilient to minor DOM changes.
+  </Step>
+
+  <Step title="Fall back to refs for precision">
+    When `browser_act` doesn't cover your case, or when you need to click a very specific element, take a snapshot and use the resulting refs. Refs give you exact, version-validated targeting.
+  </Step>
+
+  <Step title="Re-snapshot after state changes">
+    After clicking a button that triggers a navigation or a form submission that refreshes the page, always re-snapshot before your next interaction. The snapshot version will increment and give you fresh, valid refs for the new page state.
+  </Step>
+</Steps>
+
+## The action cache and self-healing
+
+Every time an agent successfully maps an intent (like `fill_email`) to a concrete selector on a given page, GSD Browser can store that mapping in the action cache. On future visits to the same page, the cache is consulted first — if the mapping is still valid, the interaction proceeds immediately without another round-trip to find the element.
+
+```bash
+# Inspect action cache statistics
+gsd-browser action-cache stats
+
+# View cached mappings for the current session
+gsd-browser action-cache get
+
+# Clear the cache if you want to start fresh
+gsd-browser action-cache clear
+```
+
+The cache is scoped per [session](/browser/concepts/sessions). A `--session checkout` cache never contaminates a `--session dashboard` cache. Over long-running agent projects, the cache makes interactions progressively faster and more robust — the system effectively learns the page's element structure from prior successes.
+
+<Tip>
+  Use named sessions with a consistent name per project. The action cache accumulates knowledge across every run on that session, giving you compounding reliability gains over time.
+</Tip>

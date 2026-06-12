@@ -1,0 +1,102 @@
+---
+title: "Starting a New Project: GSD Core Initialization Guide"
+sidebarTitle: "New Project"
+description: "Set up a new GSD Core project using the interactive wizard, a spec file, or existing design documents such as ADRs and PRDs, then plan your first phase."
+---
+
+Every GSD Core project begins with a single initialization step that captures your goals, requirements, and roadmap before any code is written. Running `/gsd-new-project` creates a structured `.planning/` directory that all subsequent workflow commands read from, giving every subagent a fresh, focused context window instead of a growing pile of chat history.
+
+## Interactive initialization
+
+Run `/gsd-new-project` with no flags to enter the interactive flow. GSD will walk you through a series of questions about your project, gathering the information it needs to generate a complete planning foundation.
+
+```bash
+/gsd-new-project
+```
+
+During the interactive session you will be prompted to describe:
+
+- **Project name and purpose** — a plain-language description of what you are building and why
+- **Target users and use cases** — who will use the system and what problems it solves for them
+- **Key requirements** — functional and non-functional constraints (performance, security, compliance)
+- **Technology preferences** — preferred languages, frameworks, and infrastructure choices
+- **Known constraints** — timelines, team size, integration dependencies
+
+Answer each prompt as concisely or as thoroughly as you like. GSD synthesizes your answers into structured artifacts rather than storing raw conversation, so more detail produces more accurate planning output.
+
+<Note>
+  GSD requires no existing `.planning/PROJECT.md` to run. If one already exists, the command exits with a warning to protect your current project state.
+</Note>
+
+## Automated initialization from a spec file
+
+If you already have a PRD, RFC, or design document, pass it directly to `/gsd-new-project` with `--auto` to skip the interactive questions entirely.
+
+```bash
+/gsd-new-project --auto @spec-file.md
+```
+
+GSD reads the referenced document, extracts project goals, requirements, and constraints automatically, and generates all planning artifacts without prompting you. Use this path when your spec file already captures enough context to produce a meaningful roadmap.
+
+<Tip>
+  The `@` prefix is the standard way to reference a file in your project. GSD resolves the path relative to your project root. You can pass any Markdown file — PRD, RFC, user story map, or architecture doc.
+</Tip>
+
+## What gets created
+
+Both initialization paths produce the same set of artifacts in `.planning/`:
+
+<CardGroup cols={2}>
+  <Card title="PROJECT.md" icon="file-lines">
+    High-level project description, goals, target users, and success criteria. All agents read this file to understand what they are building.
+  </Card>
+  <Card title="REQUIREMENTS.md" icon="list-check">
+    Structured functional and non-functional requirements. The plan-phase and verify-phase use these as the acceptance baseline.
+  </Card>
+  <Card title="ROADMAP.md" icon="map">
+    Milestone and phase breakdown. Defines the delivery sequence that `/gsd-autonomous`, `/gsd-manager`, and all phase commands follow.
+  </Card>
+  <Card title="STATE.md" icon="gauge">
+    Live project state: which phases are complete, in progress, or pending. Updated automatically after each phase transition.
+  </Card>
+  <Card title="config.json" icon="gear">
+    Project configuration: model profile, granularity, workflow toggles, and integration settings. Edit via `/gsd-settings` or `/gsd-config`.
+  </Card>
+</CardGroup>
+
+## Bootstrapping from existing documents
+
+If your repository already contains ADRs, PRDs, SPECs, or other structured documentation, use `/gsd-ingest-docs` instead of starting from scratch. This command scans your repository, classifies each document, and synthesizes the results into a complete `.planning/` setup.
+
+```bash
+/gsd-ingest-docs                        # Scan repo root, auto-detect mode
+/gsd-ingest-docs docs/                  # Only ingest documents under docs/
+/gsd-ingest-docs --manifest ingest.yaml # Use explicit precedence manifest
+```
+
+`/gsd-ingest-docs` operates in two modes detected automatically:
+
+- **`new`** — no `.planning/` directory exists; creates a full project setup from your documents
+- **`merge`** — `.planning/` already exists; merges ingested content with your current project state
+
+<Accordion title="Conflict handling during ingest">
+  When documents contradict each other, `/gsd-ingest-docs` produces an `INGEST-CONFLICTS.md` file that categorizes conflicts into three buckets:
+
+  - **Auto-resolved** — GSD chose the higher-precedence document and recorded its reasoning
+  - **Competing variants** — multiple valid options exist; GSD flags them for your review
+  - **Unresolved blockers** — LOCKED-vs-LOCKED ADR contradictions that require human resolution before planning can begin
+
+  The command hard-blocks on unresolved blockers. Resolve them in your source documents or use `--manifest ingest.yaml` to assign explicit precedence before re-running.
+</Accordion>
+
+<Warning>
+  `/gsd-ingest-docs` caps at 50 documents per invocation. For larger document sets, split the ingest into multiple runs using the `--manifest` flag to control precedence across batches.
+</Warning>
+
+## Next steps
+
+After initialization, run `/gsd-progress` to see a summary of your new project and the recommended next command. For most projects, that will be `/gsd-discuss-phase 1` to begin the first phase's context-gathering discussion.
+
+```bash
+/gsd-progress       # Show project status and recommended next step
+```

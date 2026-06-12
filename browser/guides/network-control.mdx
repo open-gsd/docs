@@ -1,0 +1,159 @@
+---
+title: "Control Network Traffic: Mocking, Blocking, and Capture"
+sidebarTitle: "Network Control"
+description: "Mock API routes, block noisy URLs, capture HAR files, run CDP traces, and intercept requests for testing and performance profiling."
+---
+
+GSD Browser gives you precise control over every network request the browser makes. You can mock API responses to test edge cases, block analytics and ad traffic to keep automation clean, capture a full HAR file for debugging, run a CDP trace for performance profiling, or inspect the live network log at any time. All network control commands work in both CLI and MCP contexts and apply immediately to the current browser session.
+
+## Mock API Routes
+
+Return a fixed response for any URL pattern without hitting a real server:
+
+```bash
+gsd-browser mock-route \
+  --url "**/api/users" \
+  --body '{"users": []}' \
+  --status 200
+```
+
+Simulate error states and loading delays:
+
+<CodeGroup>
+  ```bash Server error
+  gsd-browser mock-route \
+    --url "**/api/data" \
+    --body '{"error": "internal server error"}' \
+    --status 500
+  ```
+
+  ```bash Slow response (3 s delay)
+  gsd-browser mock-route \
+    --url "**/api/data" \
+    --body '{"ok": true}' \
+    --delay 3000
+  ```
+</CodeGroup>
+
+Remove all active mocks when you are done:
+
+```bash
+gsd-browser clear-routes
+```
+
+<Note>
+  Route mocks apply to the current session only. They are cleared automatically when the session ends. Always call `clear-routes` before switching to a different test scenario within the same session.
+</Note>
+
+## Block URLs
+
+Prevent specific requests from leaving the browser entirely. This is useful for eliminating analytics noise, ad networks, and third-party tracking during automation:
+
+```bash
+gsd-browser block-urls "**/analytics*" "**/ads*" "**/tracking*"
+```
+
+<Tip>
+  Blocking analytics and ad URLs during test runs reduces flakiness caused by third-party request timeouts. Add a `block-urls` call at the start of any test session that visits pages with heavy third-party scripts.
+</Tip>
+
+## Export a HAR File
+
+Export all captured network traffic for the current session as a HAR 1.2 JSON file. GSD Browser records every request automatically — export the buffer at any point:
+
+```bash
+gsd-browser har-export --filename traffic.har
+```
+
+Open the resulting `.har` file in [HAR Analyzer](https://toolbox.googleapps.com/apps/har_analyzer/) or import it directly into browser DevTools for inspection.
+
+<Note>
+  The network buffer accumulates continuously. Call `gsd-browser network --clear` if you want to reset the capture window before a specific flow, then export with `har-export` afterward.
+</Note>
+
+## Run a CDP Trace
+
+Capture a Chrome DevTools Protocol performance trace for deep profiling of rendering, scripting, and network timing:
+
+<Steps>
+  <Step title="Start tracing">
+    ```bash
+    gsd-browser trace-start
+    ```
+  </Step>
+  <Step title="Perform the flow you want to profile">
+    Navigate, interact, and exercise the code paths you want to measure.
+  </Step>
+  <Step title="Stop and save">
+    ```bash
+    gsd-browser trace-stop
+    ```
+  </Step>
+</Steps>
+
+Load the output file in `chrome://tracing` or [Perfetto](https://ui.perfetto.dev/) to visualize the timeline.
+
+## Inspect the Network Log
+
+Read the current network log at any time without exporting a full HAR:
+
+```bash
+gsd-browser network
+gsd-browser network --filter errors
+gsd-browser network --filter fetch-xhr
+```
+
+Combine with `--json` for programmatic parsing:
+
+```bash
+gsd-browser network --filter errors --json
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Test against mock APIs" icon="flask">
+    Set up route mocks before navigating so your automation runs against controlled data — no test accounts, seeding, or teardown required.
+  </Card>
+  <Card title="Block noise during automation" icon="ban">
+    Block analytics, ad, and telemetry URLs to eliminate flakiness from slow third-party requests and keep your HAR files clean and focused.
+  </Card>
+  <Card title="Capture traffic for debugging" icon="network-wired">
+    Use `har-export` after a problematic flow to capture every request. Share the `.har` file with your team or attach it to a bug report.
+  </Card>
+  <Card title="Performance profiling" icon="gauge-high">
+    Use CDP traces alongside HAR captures to correlate network timing with rendering and scripting bottlenecks on complex pages.
+  </Card>
+</CardGroup>
+
+## Common Patterns
+
+<AccordionGroup>
+  <Accordion title="Test an error state without touching the server">
+    ```bash
+    gsd-browser mock-route --url "**/api/users" --body '{"error": "not found"}' --status 404
+    gsd-browser navigate https://app.example.com/users
+    gsd-browser assert --checks '[{"kind": "text_visible", "text": "not found"}]'
+    gsd-browser clear-routes
+    ```
+  </Accordion>
+
+  <Accordion title="Full network audit of a page load">
+    ```bash
+    gsd-browser trace-start
+    gsd-browser navigate https://app.example.com
+    gsd-browser wait-for --condition network_idle
+    gsd-browser har-export --filename audit.har
+    gsd-browser trace-stop
+    ```
+  </Accordion>
+
+  <Accordion title="Clean automation run (no third-party noise)">
+    ```bash
+    gsd-browser block-urls "**/analytics*" "**/doubleclick*" "**/googletagmanager*"
+    gsd-browser navigate https://app.example.com
+    # ... automation steps ...
+    gsd-browser har-export --filename clean-traffic.har
+    ```
+  </Accordion>
+</AccordionGroup>

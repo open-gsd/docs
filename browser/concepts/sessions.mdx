@@ -1,0 +1,136 @@
+---
+title: "GSD Browser Sessions: Isolated Browser Contexts"
+sidebarTitle: "Sessions"
+description: "Named sessions isolate cookies, storage, and cache per workflow. Run parallel agents, persist auth state, and scope the action cache and vault per session."
+---
+
+A session in GSD Browser is an isolated browser context with its own cookies, local storage, service worker cache, and browser identity. When you target a named session, GSD Browser spins up a separate daemon instance and browser profile dedicated to that name. Sessions enable parallel agent tasks, clean separation between test scenarios, and persistent authentication states that survive across multiple runs.
+
+## The default session
+
+If you run any command without `--session`, GSD Browser uses a single shared default session. This is fine for simple scripting and one-off tasks. For anything that requires isolation — multiple agents running concurrently, different user accounts, or separate test environments — use named sessions.
+
+## Targeting a named session
+
+Add `--session <name>` to any command to route it to that session's daemon instance:
+
+```bash
+gsd-browser --session checkout navigate https://myapp.com/checkout
+gsd-browser --session checkout snapshot
+gsd-browser --session checkout click @v1:e2
+```
+
+```bash
+# A second session running in parallel
+gsd-browser --session dashboard navigate https://myapp.com/dashboard
+gsd-browser --session dashboard snapshot
+```
+
+Both sessions run independently — different Chrome windows, different cookies, zero cross-contamination.
+
+## Daemon management per session
+
+Each named session runs its own daemon. Use the `daemon` subcommands with `--session` to manage a specific session's daemon:
+
+```bash
+# Start a specific session's daemon explicitly
+gsd-browser --session checkout daemon start
+
+# Check daemon health for a session
+gsd-browser --session checkout daemon health
+
+# Stop a specific session's daemon
+gsd-browser --session checkout daemon stop
+```
+
+## Saving and restoring browser state
+
+Persist the full browser state — cookies, local storage, session storage — to disk so it can be restored later. This is the recommended way to preserve authenticated states across daemon restarts.
+
+```bash
+# Save state for the current session
+gsd-browser --session myapp save-state myapp-auth
+
+# Restore state into a session
+gsd-browser --session myapp restore-state myapp-auth
+```
+
+Saved states survive daemon restarts and machine reboots. After restoring, the session is ready to use immediately — the browser picks up authentication cookies and storage from the saved snapshot.
+
+## What sessions scope
+
+Named sessions are more than just browser profiles. Several GSD Browser subsystems use the session name as a namespace:
+
+| Subsystem | Scoped per session? |
+|---|---|
+| Cookies & local storage | ✅ Yes |
+| Service worker & cache | ✅ Yes |
+| Action cache (self-healing intent mappings) | ✅ Yes |
+| Credential vault entries | ✅ Yes |
+| Recording bundles & annotations | ✅ Yes |
+| Timeline and diagnostic logs | ✅ Yes |
+
+This means the action cache learned from a `checkout` session does not bleed into a `dashboard` session, and vault credentials stored for `checkout` are not accessible to `dashboard`.
+
+## Common patterns
+
+<Tabs>
+  <Tab title="Persistent auth">
+    Log in once, save the session state, then restore it on every future run to skip the login flow:
+
+    ```bash
+    # First run: log in and save
+    gsd-browser --session myapp navigate https://myapp.com/login
+    gsd-browser --session myapp act --intent fill_email
+    gsd-browser --session myapp act --intent fill_password
+    gsd-browser --session myapp act --intent submit_form
+    gsd-browser --session myapp wait-for --condition network_idle
+    gsd-browser --session myapp save-state myapp-auth
+
+    # All future runs: restore and continue
+    gsd-browser --session myapp restore-state myapp-auth
+    gsd-browser --session myapp navigate https://myapp.com/dashboard
+    ```
+  </Tab>
+  <Tab title="Parallel agents">
+    Run two independent agents at the same time without any interference:
+
+    ```bash
+    # Terminal 1
+    gsd-browser --session agent-a navigate https://site.com/page-a
+    gsd-browser --session agent-a snapshot
+
+    # Terminal 2 (simultaneously)
+    gsd-browser --session agent-b navigate https://site.com/page-b
+    gsd-browser --session agent-b snapshot
+    ```
+  </Tab>
+  <Tab title="Clean test scenarios">
+    Give each test a fresh session so cookies and state from one scenario never affect another:
+
+    ```bash
+    gsd-browser --session test-anonymous navigate https://myapp.com
+    gsd-browser --session test-logged-in restore-state myapp-auth
+    gsd-browser --session test-logged-in navigate https://myapp.com/dashboard
+    ```
+  </Tab>
+</Tabs>
+
+## Sessions in MCP
+
+When using the MCP server, pass the session name in the server `args` or as an environment variable so every tool call is automatically routed to the right session:
+
+```json
+{
+  "mcpServers": {
+    "gsd-browser-checkout": {
+      "command": "gsd-browser",
+      "args": ["mcp", "--session", "checkout"]
+    }
+  }
+}
+```
+
+<Tip>
+  Using a named session per project keeps the action cache and vault entries scoped to that project. Over time, the self-healing cache becomes more effective because it learns from every successful interaction in that specific session context.
+</Tip>

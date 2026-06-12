@@ -1,0 +1,146 @@
+---
+title: "Install GSD Browser on macOS, Linux, or Windows"
+sidebarTitle: "Installation"
+description: "Install GSD Browser via npm, a one-line shell script, pre-built binaries from GitHub Releases, or by building from source with Cargo."
+---
+
+GSD Browser ships as a single self-contained binary that includes both the CLI client and the background daemon. Pick the installation method that fits your environment — all methods produce the same `gsd-browser` command.
+
+## Requirements
+
+Chrome or Chromium must be installed on the machine where the daemon will run. On Windows, Microsoft Edge also works — GSD Browser auto-discovers Chrome or Edge from standard install locations (including `Program Files`, `Program Files (x86)`, and `LocalAppData`) as well as your `PATH`. On macOS and Linux, the daemon checks the usual Chrome and Chromium locations and falls back to a `PATH` search. If your browser lives somewhere non-standard, point to it with `--browser-path /path/to/chrome` or set `GSD_BROWSER_BROWSER_PATH` in your environment.
+
+GSD Browser runs natively on macOS, Linux, and Windows. The Windows daemon uses named pipes for local IPC, so no extra setup (such as WSL) is required.
+
+## Install methods
+
+<Tabs>
+  <Tab title="npm (recommended)">
+    Installing via npm puts `gsd-browser` on your `PATH` through the standard Node.js global bin mechanism — no manual download or PATH editing required.
+
+    ```bash
+    npm install -g @opengsd/gsd-browser
+    ```
+
+    <Tip>
+      The npm package resolves the correct platform binary automatically. It supports macOS arm64, macOS x64, Linux arm64, Linux x64, and Windows x64.
+    </Tip>
+  </Tab>
+  <Tab title="One-line installer">
+    The shell installer downloads the correct binary for your platform, places it in `~/.local/bin` (or `/usr/local/bin` with sudo), and optionally sets up the agent skill pack.
+
+    ```bash
+    bash <(curl -fsSL https://raw.githubusercontent.com/open-gsd/gsd-browser/main/install.sh)
+    ```
+
+    To also install and register the Codex Plugin in one pass:
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/open-gsd/gsd-browser/main/install.sh | bash -s -- --codex-plugin
+    ```
+  </Tab>
+  <Tab title="Pre-built binaries">
+    Download the binary for your platform directly from [GitHub Releases](https://github.com/open-gsd/gsd-browser/releases), then make it executable and move it onto your `PATH`.
+
+    | Platform | Asset name |
+    |---|---|
+    | macOS (Apple Silicon) | `gsd-browser-darwin-arm64` |
+    | macOS (Intel) | `gsd-browser-darwin-x64` |
+    | Linux (ARM64) | `gsd-browser-linux-arm64` |
+    | Linux (x64) | `gsd-browser-linux-x64` |
+    | Windows (x64) | `gsd-browser-windows-x64.exe` |
+
+    ```bash
+    # macOS / Linux example
+    chmod +x gsd-browser-darwin-arm64
+    mv gsd-browser-darwin-arm64 /usr/local/bin/gsd-browser
+    ```
+
+    <Note>
+      The Windows binary runs natively — the daemon uses named pipes for local IPC and auto-discovers Chrome or Microsoft Edge from standard install paths and `PATH`. WSL is not required.
+    </Note>
+  </Tab>
+  <Tab title="Build from source">
+    Build from source if you want a custom feature set (such as the stealth backend) or need to run from a local checkout.
+
+    ```bash
+    git clone https://github.com/open-gsd/gsd-browser.git
+    cd gsd-browser
+    cargo install --path cli
+    ```
+
+    To build with an alternative backend:
+
+    ```bash
+    # Stealth/anti-detection backend
+    cargo install --path cli --no-default-features --features stealth
+
+    # Chromey backend (fresher CDP definitions + adblock)
+    cargo install --path cli --no-default-features --features chromey-backend
+    ```
+
+    <Note>
+      Rust 1.75 or later is required. Install Rust via [rustup.rs](https://rustup.rs) if you don't have it already.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Verify your installation
+
+Run the following command to confirm `gsd-browser` is on your `PATH` and print the installed version:
+
+```bash
+gsd-browser --version
+```
+
+## Start the daemon
+
+The daemon starts automatically the first time you run any browser command, so you don't need to start it manually in most workflows. To pre-warm it explicitly or verify it is running:
+
+```bash
+gsd-browser daemon start
+```
+
+Check its health at any time without triggering a new start:
+
+```bash
+gsd-browser daemon health
+```
+
+## Configuration (optional)
+
+GSD Browser merges configuration from five sources in order of increasing precedence:
+
+1. Built-in defaults
+2. User config: `~/.gsd-browser/config.toml`
+3. Project config: `./gsd-browser.toml`
+4. Environment variables: `GSD_BROWSER_*`
+5. CLI flags
+
+A minimal project config looks like this:
+
+```toml gsd-browser.toml
+[browser]
+path = "/usr/bin/chromium"
+headless = true
+
+[daemon]
+port = 9222
+host = "127.0.0.1"
+
+[artifacts]
+dir = "./browser-artifacts"
+```
+
+Common environment variable overrides:
+
+```bash
+export GSD_BROWSER_BROWSER_PATH=/usr/bin/chromium
+export GSD_BROWSER_BROWSER_HEADLESS=true
+export GSD_BROWSER_VAULT_KEY=your-strong-encryption-key
+export GSD_BROWSER_ARTIFACTS_DIR=./browser-artifacts
+```
+
+<Tip>
+  When using the MCP server, place `GSD_BROWSER_*` environment variables in your MCP client's server `env` configuration block rather than your shell profile. This ensures the daemon inherits them when the MCP client spawns the process.
+</Tip>

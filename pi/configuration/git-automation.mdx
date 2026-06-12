@@ -1,0 +1,223 @@
+---
+title: "GSD Pi Git Automation: Commits, PRs, and Branch Isolation"
+sidebarTitle: "Git Automation"
+description: "Control GSD Pi's automatic commits, branch isolation, pull requests, and GitHub sync — configure every aspect of Git automation."
+---
+
+GSD Pi manages your Git history automatically — committing after each task, isolating milestone work in branches or worktrees, and optionally creating pull requests and syncing with GitHub Issues. You control every aspect of this behavior through the `git` section of your `PREFERENCES.md` file.
+
+## Git Preferences
+
+Add or edit the `git` block in `~/.gsd/PREFERENCES.md` (global) or `.gsd/PREFERENCES.md` (project-level):
+
+```yaml
+git:
+  auto_push: false             # Push commits to remote after committing
+  push_branches: false         # Push the milestone branch to remote
+  remote: origin               # Git remote name (default: origin)
+  snapshots: true              # Create WIP snapshot commits during long tasks
+  merge_strategy: squash       # "squash" or "merge"
+  isolation: none              # "none", "worktree", or "branch"
+  commit_docs: true            # Commit .gsd/ planning artifacts to git
+  manage_gitignore: true       # Auto-update .gitignore
+  auto_pr: false               # Create a PR on milestone completion
+  pr_target_branch: main       # Branch to target for auto-created PRs
+```
+
+### Setting Reference
+
+<Accordion title="git.isolation — Control where work happens">
+  The most consequential git setting. Choose how GSD isolates each milestone's work:
+
+  | Value | Behavior |
+  |-------|----------|
+  | `none` (default) | Work happens directly on your current branch. No worktree or milestone branch created. Ideal for hot-reload workflows and small projects. |
+  | `worktree` | Each milestone gets a separate directory at `.gsd-worktrees/<MID>/` (a sibling of `.gsd/` at the project root) on a `milestone/<MID>` branch. Full file isolation. Squash-merged to main on completion. Worktrees created under the legacy `.gsd/worktrees/<MID>/` location are still recognized for resolution, listing, merge, and teardown. |
+  | `branch` | Work stays in the project root on a `milestone/<MID>` branch. No separate directory. Best for submodule-heavy repos where worktrees cause problems. |
+
+  ```yaml
+  git:
+    isolation: worktree
+  ```
+
+  See the [Worktrees guide](/pi/guides/worktrees) for full details on each mode.
+</Accordion>
+
+<Accordion title="git.merge_strategy — How milestone branches merge">
+  Controls whether GSD squashes all milestone commits into one clean commit on main, or preserves the individual commit history:
+
+  | Value | Behavior |
+  |-------|----------|
+  | `squash` (default) | All commits are squashed into one clean commit on main. Gives a linear history with one meaningful commit per milestone. |
+  | `merge` | Individual commits from the milestone branch are preserved. Use when you want a detailed commit history per task. |
+
+  ```yaml
+  git:
+    merge_strategy: squash
+  ```
+</Accordion>
+
+<Accordion title="git.snapshots — WIP commits during long tasks">
+  When enabled, GSD creates snapshot commits during long-running tasks so work-in-progress is preserved even if the session is interrupted.
+
+  ```yaml
+  git:
+    snapshots: true   # default: true
+  ```
+
+  Snapshot commits use a `wip:` prefix and are squashed away when the milestone completes.
+</Accordion>
+
+<Accordion title="git.commit_docs — Version-control planning artifacts">
+  Controls whether GSD commits `.gsd/` planning files (milestones, roadmaps, decisions, etc.) to git alongside code.
+
+  ```yaml
+  git:
+    commit_docs: true    # Commit .gsd/ to git (default)
+  ```
+
+  Set to `false` to keep all planning artifacts local-only. GSD will add `.gsd/` to `.gitignore` automatically. Useful for teams where only some members use GSD, or when company policy requires a clean repository.
+</Accordion>
+
+<Accordion title="git.manage_gitignore — Auto-update .gitignore">
+  When enabled (the default), GSD automatically updates `.gitignore` with its baseline patterns and removes stale entries during self-healing.
+
+  ```yaml
+  git:
+    manage_gitignore: false   # Set false to manage .gitignore yourself
+  ```
+</Accordion>
+
+## Automatic Pull Requests
+
+GSD can create a pull request automatically when a milestone completes. This is designed for teams using branch-based workflows where code goes through PR review before merging.
+
+```yaml
+git:
+  auto_push: true           # Required — the branch must be pushed before a PR can be created
+  push_branches: true       # Push the milestone branch to remote
+  auto_pr: true             # Create a PR on milestone completion
+  pr_target_branch: develop # Target branch (default: main)
+```
+
+<Note>
+  Automatic PR creation requires the [`gh` CLI](https://cli.github.com/) to be installed and authenticated (`gh auth login`). PR creation failure is non-fatal — GSD logs a warning and continues.
+</Note>
+
+### Manual PR Creation
+
+Create a PR from inside a GSD session at any time with `/gsd ship`:
+
+```text
+/gsd ship
+/gsd ship --draft           # Open as draft PR
+/gsd ship --base develop    # Override the target branch
+/gsd ship --dry-run         # Preview without creating
+```
+
+Use `/gsd closeout` to finalize a milestone and run any remaining git closeout actions:
+
+```text
+/gsd closeout status    # Show pending closeout actions
+/gsd closeout retry     # Retry a failed closeout step
+/gsd closeout resolve   # Mark a step resolved manually
+```
+
+## GitHub Integration
+
+GSD can sync milestones, slices, and tasks to GitHub Issues, Milestones, and Projects automatically. Enable and configure it in `PREFERENCES.md`:
+
+```yaml
+github:
+  enabled: true
+  repo: "owner/repo"              # Auto-detected from git remote if omitted
+  labels: [gsd, auto-generated]  # Labels applied to created issues and PRs
+  project: "Project ID"           # Optional GitHub Project board to link
+```
+
+| Field | Description |
+|-------|-------------|
+| `enabled` | Enable or disable GitHub sync |
+| `repo` | GitHub repository in `owner/repo` format. Auto-detected from your git remote if not set. |
+| `labels` | Labels to apply to all GSD-created issues and PRs |
+| `project` | GitHub Project ID for project board integration |
+
+<Note>
+  GitHub integration requires the `gh` CLI installed and authenticated. Sync mapping is persisted in `.gsd/.github-sync.json`. GSD is rate-limit aware and skips sync automatically when the GitHub API limit is low.
+</Note>
+
+### GitHub Sync Commands
+
+```text
+/github-sync bootstrap   # Initial setup — create Issues and draft PRs from current .gsd/ state
+/github-sync status      # Show sync mapping counts (milestones, slices, tasks)
+```
+
+## Workflow Modes
+
+Instead of configuring every git setting individually, set a `mode` to apply sensible defaults for your workflow:
+
+```yaml
+mode: solo    # Personal projects
+mode: team    # Shared repos and team workflows
+```
+
+| Setting | `solo` | `team` |
+|---------|--------|--------|
+| `git.auto_push` | `true` | `false` |
+| `git.push_branches` | `false` | `true` |
+| `git.pre_merge_check` | `false` | `true` |
+| `git.merge_strategy` | `squash` | `squash` |
+| `git.isolation` | `none` | `none` |
+| `git.commit_docs` | `true` | `true` |
+| `unique_milestone_ids` | `false` | `true` |
+
+Any explicit preference you set overrides the mode default. Switch modes interactively with `/gsd mode`.
+
+## Commit Format
+
+GSD writes commits using the conventional commit format with unit metadata in trailers. Per-task commits carry a `GSD-Task` trailer; milestone-closeout commits created by interactive `gsd_complete_milestone` carry a `GSD-Unit` trailer that names the closed milestone:
+
+```
+feat: core type definitions
+
+GSD-Task: M001/S01/T01
+
+feat: markdown parser for plan files
+
+GSD-Task: M001/S01/T02
+
+chore: complete-milestone M001
+
+GSD-Unit: M001
+```
+
+See [Milestone Completion in Interactive Sessions](/pi/guides/worktrees#milestone-completion-in-interactive-sessions) for when the milestone closeout commit is created and which notices accompany it.
+
+Override the default commit type prefix with `git.commit_type`:
+
+```yaml
+git:
+  commit_type: feat   # "feat", "fix", "refactor", "docs", "test", "chore", etc.
+```
+
+## Self-Healing Git Issues
+
+GSD automatically recovers from common Git problems:
+
+<CardGroup cols={2}>
+  <Card title="Stale lock files" icon="lock-open">
+    Removes `.git/index.lock` only after it's older than 5 minutes, so active git operations on large repos aren't interrupted.
+  </Card>
+  <Card title="Interrupted operations" icon="rotate-left">
+    Aborts leftover rebase, cherry-pick, or revert state from a killed worker before reconciling merge state.
+  </Card>
+  <Card title="Orphaned worktrees" icon="broom">
+    Detects and offers to clean up abandoned worktrees from crashed sessions.
+  </Card>
+  <Card title="Unsafe branch resets" icon="shield">
+    Refuses to force-reset a milestone branch if doing so would orphan commits unreachable from the start point.
+  </Card>
+</CardGroup>
+
+Run `/gsd doctor` to check Git health manually and surface any issues that need attention.

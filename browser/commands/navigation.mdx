@@ -1,0 +1,173 @@
+---
+title: "GSD Browser Navigation Commands: navigate, back, wait-for"
+sidebarTitle: "Navigation"
+description: "Complete reference for GSD Browser navigation commands: navigate, back, forward, reload, wait-for, and global flags that apply to every command."
+---
+
+Navigation commands control where the browser goes and how long it waits to get there. Every command in this group operates on the active tab of the current session; use the `--session` global flag when you need to target a named parallel instance. Before using any element-based command after navigation, run `gsd-browser snapshot` to capture fresh, versioned refs for the new page state.
+
+## Global Flags
+
+These flags are accepted by **every** `gsd-browser` command, not just navigation commands.
+
+<ParamField query="--json" type="flag">
+  Emit machine-readable JSON on stdout instead of human-readable text. Errors are also written as JSON to stderr.
+</ParamField>
+
+<ParamField query="--session" type="string">
+  Target a named daemon session. Use this when you have multiple parallel browser instances running side-by-side.
+</ParamField>
+
+<ParamField query="--browser-path" type="string">
+  Path to a custom Chrome or Chromium binary. Overrides the value set in your config file.
+</ParamField>
+
+<ParamField query="--cdp-url" type="string">
+  Connect to an already-running Chrome instance via a Chrome DevTools Protocol (CDP) endpoint (e.g. `ws://localhost:9222`). Accepts both `ws://` and `http://` endpoints.
+</ParamField>
+
+<ParamField query="--no-narration-delay" type="flag">
+  Skip the lead-time sleeps that gsd-browser inserts between narrated actions. Useful in CI where speed matters more than realistic pacing.
+</ParamField>
+
+---
+
+## `gsd-browser navigate`
+
+Navigate the active tab to a URL. The command waits for the page to load before returning. Combine with a subsequent `gsd-browser wait-for` call when you need finer control over the ready condition.
+
+```bash
+gsd-browser navigate <url> [flags]
+```
+
+<ParamField path="url" type="string" required>
+  The fully-qualified URL to navigate to (e.g. `https://example.com/login`).
+</ParamField>
+
+**Examples**
+
+```bash
+# Basic navigation
+gsd-browser navigate https://example.com
+
+# Navigate in a named session
+gsd-browser navigate https://example.com --session staging
+
+# Navigate and get structured output
+gsd-browser navigate https://example.com --json
+```
+
+---
+
+## `gsd-browser back`
+
+Go back one step in the active tab's navigation history — the browser equivalent of clicking the Back button.
+
+```bash
+gsd-browser back
+```
+
+**Example**
+
+```bash
+gsd-browser navigate https://example.com/step-2
+gsd-browser back
+# Now on the previous page
+```
+
+---
+
+## `gsd-browser forward`
+
+Go forward one step in the active tab's navigation history — the browser equivalent of clicking the Forward button.
+
+```bash
+gsd-browser forward
+```
+
+**Example**
+
+```bash
+gsd-browser back
+gsd-browser forward
+# Back where you started
+```
+
+---
+
+## `gsd-browser reload`
+
+Reload the current page.
+
+```bash
+gsd-browser reload
+```
+
+**Example**
+
+```bash
+# Reload the active page
+gsd-browser reload
+```
+
+---
+
+## `gsd-browser wait-for`
+
+Block until a specified page condition becomes true. Use `wait-for` after actions that trigger asynchronous changes — navigation, form submission, AJAX calls, or animations — before your next interaction step.
+
+```bash
+gsd-browser wait-for --condition <condition> [--value <value>] [--timeout <ms>] [--threshold <expr>]
+```
+
+<ParamField query="--condition" type="string" required>
+  The condition to wait for. Supported values:
+
+  | Condition | Description |
+  |---|---|
+  | `selector_visible` | An element matching `--value` appears in the DOM and is visible |
+  | `selector_hidden` | An element matching `--value` is removed or hidden |
+  | `url_contains` | The current URL contains the substring in `--value` |
+  | `network_idle` | No pending network requests for a short period |
+  | `delay` | Wait a fixed number of milliseconds (set with `--value`) |
+  | `text_visible` | Text matching `--value` appears on the page |
+  | `text_hidden` | Text matching `--value` disappears from the page |
+  | `request_completed` | A network request whose URL contains `--value` completes |
+  | `console_message` | A console message containing `--value` is logged |
+  | `element_count` | The count of elements matching `--value` satisfies `--threshold` |
+  | `region_stable` | The element at `--value` stops changing (useful after animations) |
+</ParamField>
+
+<ParamField query="--value" type="string">
+  Condition-specific value: a CSS selector, URL substring, text string, or delay in milliseconds depending on the chosen `--condition`.
+</ParamField>
+
+<ParamField query="--timeout" type="number">
+  Maximum time to wait in milliseconds before the command fails. Defaults to `10000` (10 seconds).
+</ParamField>
+
+<ParamField query="--threshold" type="string">
+  Comparison expression for `element_count`, e.g. `>=3`, `==0`, `<5`.
+</ParamField>
+
+**Examples**
+
+```bash
+# Wait for the page to finish all network activity
+gsd-browser wait-for --condition network_idle
+
+# Wait for a specific element to appear (up to 30 s)
+gsd-browser wait-for --condition selector_visible --value "#content" --timeout 30000
+
+# Wait until the URL changes to the dashboard
+gsd-browser wait-for --condition url_contains --value "/dashboard"
+
+# Wait for a success message to appear
+gsd-browser wait-for --condition text_visible --value "Your order has been placed"
+
+# Wait until at least 5 result items are rendered
+gsd-browser wait-for --condition element_count --value ".result-item" --threshold ">=5"
+
+# Wait for an element to stop animating before capturing a screenshot
+gsd-browser wait-for --condition region_stable --value "#hero-banner"
+```

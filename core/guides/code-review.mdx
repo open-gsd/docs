@@ -1,0 +1,162 @@
+---
+title: "GSD Core Code Review: Quality Gates and Audit Commands"
+sidebarTitle: "Code Review"
+description: "Use GSD Core's code review, audit-fix pipeline, test generation, security verification, and Nyquist coverage audit commands to ship with confidence."
+---
+
+GSD Core ships several quality gate commands that you can run at any point after a phase has been executed. Each command is independent — you can run just a quick code review after execution, deep security verification before shipping, or the full pipeline for production-critical phases. All commands produce structured Markdown artifacts that feed back into the planning loop.
+
+## Code review
+
+Run `/gsd-code-review N` to review all files changed during a phase. The reviewer agent classifies findings by severity — Critical, Warning, and Info — and writes a structured `REVIEW.md` that you can act on immediately or feed into the fix pipeline.
+
+```bash
+/gsd-code-review 3                              # Standard review for phase 3
+/gsd-code-review 2 --depth=deep                 # Deep cross-file review
+/gsd-code-review 4 --files src/auth.ts,src/api.ts  # Review specific files only
+/gsd-code-review 3 --fix                        # Review then fix Critical + Warning findings
+/gsd-code-review 3 --fix --all                  # Review then fix all findings including Info
+/gsd-code-review 3 --fix --auto                 # Review, fix, and re-review until clean (max 3 iterations)
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--depth=quick` | Pattern-matching only, approximately 2 minutes |
+  | `--depth=standard` | Per-file analysis with language-specific checks, 5–15 minutes (default) |
+  | `--depth=deep` | Cross-file analysis including import graphs and call chains, 15–30 minutes |
+  | `--files file1,file2` | Review explicit comma-separated files; skips SUMMARY/git scoping |
+  | `--fix` | Auto-fix Critical and Warning findings after review |
+  | `--fix --all` | Expand fix scope to include Info-level findings |
+  | `--fix --auto` | Fix-and-re-review loop, capped at 3 iterations |
+</Accordion>
+
+**Produces:** `{phase}-REVIEW.md` with severity-classified findings; `{phase}-REVIEW-FIX.md` when `--fix` is used
+
+<Note>
+  You can set a default review depth in config with `workflow.code_review_depth: "quick" | "standard" | "deep"`. Override it per run with `--depth=`. Set `workflow.code_review: false` to gate the command project-wide.
+</Note>
+
+### Structural pre-pass with fallow
+
+Enable the optional fallow structural analysis pre-pass to catch architectural issues before the agent review runs. Set `code_quality.fallow.enabled: true` in `config.json` and GSD will produce a `{phase}/FALLOW.json` artifact and embed a **Structural Findings** section in `REVIEW.md`.
+
+```json
+{
+  "code_quality": {
+    "fallow": {
+      "enabled": true,
+      "scope": "phase",
+      "profile": "standard"
+    }
+  }
+}
+```
+
+## Autonomous audit-to-fix pipeline
+
+Run `/gsd-audit-fix` to run a full audit, classify all findings, auto-fix what can be fixed safely, verify each fix with tests, and commit atomically — all without manual intervention.
+
+```bash
+/gsd-audit-fix                              # Audit-uat, fix medium+ issues (max 5)
+/gsd-audit-fix --severity high              # Only process high-severity findings
+/gsd-audit-fix --dry-run                    # Preview the classification table without fixing
+/gsd-audit-fix --max 10 --severity all      # Fix up to 10 issues of any severity
+/gsd-audit-fix --source audit-uat           # Specify which audit to run (default: audit-uat)
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--source <audit>` | Audit to run (default: `audit-uat`) |
+  | `--severity high\|medium\|all` | Minimum severity to process (default: `medium`) |
+  | `--max N` | Maximum number of findings to fix in one run (default: 5) |
+  | `--dry-run` | Classify findings and print a classification table without applying any fixes |
+</Accordion>
+
+**Produces:** Fix commits with test verification for each resolved finding; a classification report listing finding type, severity, and disposition
+
+## Test generation
+
+Run `/gsd-add-tests N` after a phase completes to generate a test suite for the code it produced. The command reads the phase's PLAN.md and SUMMARY.md to understand what was built and generates tests that verify the expected behavior.
+
+```bash
+/gsd-add-tests 2                    # Generate tests for phase 2
+```
+
+**Produces:** Test files committed alongside the phase code
+
+<Tip>
+  If you prefer tests written before implementation, enable TDD mode instead. Set `workflow.tdd_mode: true` in `config.json` or pass `--tdd` to `/gsd-plan-phase`. In TDD mode, the planner generates tasks that start with a failing test before any implementation code is written.
+</Tip>
+
+## Security threat verification
+
+Run `/gsd-secure-phase N` to retroactively verify that threat mitigations were implemented for a completed phase. The command reads the phase's threat model (from PLAN.md or an existing SECURITY.md) and walks through each threat to confirm the mitigation was actually applied.
+
+```bash
+/gsd-secure-phase                   # Audit the last completed phase
+/gsd-secure-phase 5                 # Audit a specific phase
+```
+
+The command operates in three modes depending on what artifacts exist:
+
+<CardGroup cols={3}>
+  <Card title="SECURITY.md exists" icon="shield-check">
+    Audits and verifies existing threat mitigations against the shipped code.
+  </Card>
+  <Card title="No SECURITY.md, PLAN.md has threat model" icon="shield-halved">
+    Generates SECURITY.md from planning artifacts and then verifies mitigations.
+  </Card>
+  <Card title="Phase not yet executed" icon="shield-xmark">
+    Exits with guidance — security verification requires executed code to analyze.
+  </Card>
+</CardGroup>
+
+**Produces:** `{phase}-SECURITY.md` with per-threat verification results
+
+Configure security enforcement settings in `config.json`:
+
+```json
+{
+  "workflow": {
+    "security_enforcement": true,
+    "security_asvs_level": 1,
+    "security_block_on": "high"
+  }
+}
+```
+
+## Nyquist coverage audit
+
+Run `/gsd-validate-phase N` to perform a retroactive Nyquist test coverage audit — verifying that the test coverage written during execution maps correctly to the requirements laid out in the phase plan.
+
+```bash
+/gsd-validate-phase 2               # Nyquist coverage audit for phase 2
+```
+
+**Produces:** A coverage mapping report that identifies requirements with missing or insufficient test coverage, written to the phase directory
+
+<Info>
+  The Nyquist audit uses the same coverage mapping engine as the plan-phase research step (controlled by `workflow.nyquist_validation`). Running `/gsd-validate-phase` gives you retroactive coverage analysis on phases that were executed before Nyquist was enabled, or after requirements have been revised.
+</Info>
+
+## Quality gate summary
+
+<CardGroup cols={2}>
+  <Card title="/gsd-code-review" icon="magnifying-glass-chart">
+    Review phase changes by depth level. Use `--fix --auto` for a fully autonomous review-and-fix loop.
+  </Card>
+  <Card title="/gsd-audit-fix" icon="wrench">
+    Autonomous audit-to-fix pipeline with severity filtering, dry-run preview, and atomic commits.
+  </Card>
+  <Card title="/gsd-add-tests" icon="vial">
+    Generate a test suite for any completed phase based on its plan and implementation artifacts.
+  </Card>
+  <Card title="/gsd-secure-phase" icon="lock">
+    Retroactive threat mitigation verification anchored to OWASP ASVS levels.
+  </Card>
+  <Card title="/gsd-validate-phase" icon="clipboard-check">
+    Nyquist test coverage audit that maps requirements to tests and flags gaps.
+  </Card>
+</CardGroup>

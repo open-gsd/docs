@@ -1,0 +1,270 @@
+---
+title: "GSD Core Project Commands: Milestones and Lifecycle"
+sidebarTitle: "Project"
+description: "Reference for GSD Core project lifecycle commands — milestones, phase management, session handoffs, health checks, and statistics."
+---
+
+The project commands manage everything above the individual phase: milestone boundaries, phase-list edits, session handoffs, and overall project health. Use them to start and complete version cycles, restructure your roadmap, save and restore work across sessions, and audit the integrity of your `.planning/` directory.
+
+---
+
+## `/gsd-new-milestone [name]`
+
+Start a new version cycle for an existing project.
+
+**Syntax**
+
+```bash
+/gsd-new-milestone
+/gsd-new-milestone "v1.1 Notifications"
+/gsd-new-milestone "v2.0 Payments" --reset-phase-numbers
+```
+
+**What it does**
+
+The brownfield equivalent of `/gsd-new-project`. Your project already exists and `PROJECT.md` has its history. This command gathers what's next, updates `PROJECT.md` with the new milestone goals, then runs a full requirements → roadmap cycle. Phase numbering continues from where the previous milestone left off unless you reset it.
+
+**Produces**
+
+| Artifact | Purpose |
+|---|---|
+| `.planning/PROJECT.md` | Updated with new milestone goals |
+| `.planning/REQUIREMENTS.md` | Scoped requirements for this milestone |
+| `.planning/ROADMAP.md` | Phase structure (continuing numbering) |
+| `.planning/STATE.md` | Reset for the new milestone |
+| `.planning/research/` | Domain research for new features (optional) |
+
+**Flags**
+
+<ParamField query="--reset-phase-numbers" type="flag">
+  Restart phase numbering from 1 for the new milestone instead of continuing from the last milestone's final phase number.
+</ParamField>
+
+**Next step:** Run `/gsd-plan-phase [N]` to begin the first phase of the new milestone.
+
+---
+
+## `/gsd-milestone-summary [version]`
+
+Generate a comprehensive milestone report for team onboarding and review.
+
+**Syntax**
+
+```bash
+/gsd-milestone-summary
+/gsd-milestone-summary v1.0
+```
+
+**What it does**
+
+Reads completed milestone artifacts — `ROADMAP.md`, `REQUIREMENTS.md`, `CONTEXT.md`, `SUMMARY.md`, `VERIFICATION.md`, `RESEARCH.md`, and `RETROSPECTIVE.md` files — and produces a structured seven-section human-friendly overview of what was built, how, and why. After generation, offers an interactive Q&A session so new team members can explore the context further. Omit the version to default to the current or latest milestone.
+
+**Produces**
+
+`.planning/reports/MILESTONE_SUMMARY-v{version}.md` covering: Overview, Architecture, Phases, Key Decisions, Requirements, Tech Debt, and Getting Started.
+
+---
+
+## `/gsd-complete-milestone`
+
+Archive a completed milestone and prepare for the next version.
+
+**Syntax**
+
+```bash
+/gsd-complete-milestone
+```
+
+**What it does**
+
+Marks the current milestone complete by verifying all phases have `SUMMARY.md` files, gathering stats (phase count, plan count, git range, LOC, timeline), archiving the roadmap and requirements to `.planning/milestones/`, collapsing `ROADMAP.md` to a single summary line, updating `PROJECT.md` with the shipped version, and tagging the release in git. Checks for a passing audit before proceeding — if no audit exists it recommends running `/gsd-audit-milestone` first.
+
+**Produces**
+
+| Artifact | Purpose |
+|---|---|
+| `.planning/milestones/v{ver}-ROADMAP.md` | Archived roadmap for this milestone |
+| `.planning/milestones/v{ver}-REQUIREMENTS.md` | Archived requirements with completion status |
+| `git tag v{ver}` | Version tag (if `git.create_tag` is enabled) |
+
+---
+
+## `/gsd-audit-milestone`
+
+Verify a milestone met its definition of done before archiving.
+
+**Syntax**
+
+```bash
+/gsd-audit-milestone
+/gsd-audit-milestone v1.2
+```
+
+**What it does**
+
+Aggregates `VERIFICATION.md` files from all completed phases, checks requirements coverage, identifies tech debt and deferred gaps, then spawns an integration checker to verify cross-phase wiring. Produces a structured audit report with a `passed` or `gaps_found` status. Run this before `/gsd-complete-milestone`. Omit the version to audit the current milestone.
+
+**Produces**
+
+`.planning/v{version}-MILESTONE-AUDIT.md` — coverage report with status verdict, gap list, and recommended remediation steps.
+
+---
+
+## `/gsd-phase`
+
+CRUD operations for phases in `ROADMAP.md`.
+
+**Syntax**
+
+```bash
+/gsd-phase "Add payment provider integration"
+/gsd-phase --insert 3 "Urgent security patch"
+/gsd-phase --remove 7
+/gsd-phase --edit 4
+/gsd-phase --edit 4 --force
+```
+
+**What it does**
+
+Manages your phase list with a single consolidated command. Without a flag it adds a new integer phase to the end of the current milestone. With `--insert` it creates a decimal phase (e.g., `3.1`) between existing phases for urgent work. With `--remove` it deletes a future phase and renumbers subsequent phases. With `--edit` it updates fields of an existing phase in place.
+
+**Flags**
+
+<ParamField query="--insert N" type="number">
+  Insert an urgent work phase as a decimal (e.g., `3.1`) immediately after phase `N`. Pass the description as the remaining argument.
+</ParamField>
+
+<ParamField query="--remove N" type="number">
+  Remove future phase `N` and renumber all subsequent phases to keep the sequence clean.
+</ParamField>
+
+<ParamField query="--edit N" type="number">
+  Edit any field of existing phase `N` in place — name, goal, complexity, or mode.
+</ParamField>
+
+<ParamField query="--force" type="flag">
+  Skip the confirmation gate when editing. Use with `--edit` only.
+</ParamField>
+
+---
+
+## `/gsd-mvp-phase N`
+
+Guide MVP vertical-slice planning for an existing phase.
+
+**Syntax**
+
+```bash
+/gsd-mvp-phase 2
+/gsd-mvp-phase 2.1
+```
+
+**What it does**
+
+Prompts you for a structured "As a / I want to / So that" user story, runs a SPIDR splitting check to catch stories that are too large for a single phase, rewrites the phase goal in `ROADMAP.md` with `**Mode:** mvp`, then delegates to `/gsd-plan-phase` which auto-detects MVP mode. The phase must already exist in `ROADMAP.md` — this command converts an existing phase, it does not create new ones.
+
+---
+
+## `/gsd-resume-work`
+
+Restore full context from your last session and resume where you left off.
+
+**Syntax**
+
+```bash
+/gsd-resume-work
+```
+
+**What it does**
+
+Loads `STATE.md` (or reconstructs it if missing), detects any `.continue-here` checkpoint files left by `/gsd-pause-work`, finds incomplete plans that have no corresponding `SUMMARY.md`, presents your current status, and routes you to the most appropriate next action.
+
+---
+
+## `/gsd-pause-work`
+
+Save a complete context handoff before ending a session.
+
+**Syntax**
+
+```bash
+/gsd-pause-work
+/gsd-pause-work --report
+```
+
+**What it does**
+
+Creates a `.continue-here.md` handoff file that captures your exact position in the phase, all work completed so far, remaining tasks, key decisions made, and any active blockers. Commits the file as a WIP commit and prints resume instructions for your next session.
+
+**Flags**
+
+<ParamField query="--report" type="flag">
+  Generate a session report (`SESSION_REPORT.md`) summarizing what was accomplished this session, in addition to creating the standard handoff file.
+</ParamField>
+
+---
+
+## `/gsd-manager`
+
+Interactive multi-phase command center for power users.
+
+**Syntax**
+
+```bash
+/gsd-manager
+/gsd-manager --analyze-deps
+```
+
+**What it does**
+
+Opens a single-terminal dashboard showing all phases with visual status indicators, recommends the optimal next action for each, and dispatches work — discuss runs inline while plan and execute run as background agents. Designed for parallelizing work across phases: you can discuss one phase while another is planning or executing in the background. Exit when you finish managing or when all phases complete and the milestone lifecycle triggers.
+
+**Flags**
+
+<ParamField query="--analyze-deps" type="flag">
+  Run a dependency analysis across all phases before opening the dashboard. Shows which phases block others and recommends an optimal execution order.
+</ParamField>
+
+---
+
+## `/gsd-health`
+
+Validate `.planning/` directory integrity and diagnose issues.
+
+**Syntax**
+
+```bash
+/gsd-health
+/gsd-health --repair
+/gsd-health --context
+```
+
+**What it does**
+
+Scans your `.planning/` directory for missing required files, invalid `config.json` values, inconsistent state, and orphaned plan files. Reports every issue with an actionable fix suggestion. With `--repair` it automatically resolves any issues it can fix safely.
+
+**Flags**
+
+<ParamField query="--repair" type="flag">
+  Automatically repair any issues that can be safely fixed — missing directories, malformed state entries, and orphaned artifacts.
+</ParamField>
+
+<ParamField query="--context" type="flag">
+  Check the current session's context utilization instead of the `.planning/` directory. Reports one of three states: healthy (under 60%), warning (60–70%, recommend starting a new thread with `/gsd-thread`), or critical (70%+, reasoning quality may degrade).
+</ParamField>
+
+---
+
+## `/gsd-stats`
+
+Display a project statistics dashboard.
+
+**Syntax**
+
+```bash
+/gsd-stats
+```
+
+**What it does**
+
+Reads your `.planning/` directory and git history to display comprehensive project metrics: phase progress, plan execution counts, requirements completion percentage, git commit stats, file change counts, lines of code, and project timeline. No arguments or flags needed — run it any time you want a snapshot of where the project stands.

@@ -1,0 +1,147 @@
+---
+title: "GSD Core Specialist Agents: Roles and Architecture"
+sidebarTitle: "Agents"
+description: "Meet GSD Core's specialist agents: researchers, planners, executors, verifiers, and auditors that spawn fresh for each task to eliminate context rot."
+---
+
+GSD Core uses a multi-agent architecture where thin orchestrators spawn specialized agents with clean context windows. Rather than accumulating a single long conversation where quality degrades over time, each specialist agent starts fresh — with up to 200K tokens of context, or up to 1M tokens on models that support it — focused only on its assigned task, reading only the artifacts it needs.
+
+You do not invoke agents directly. Orchestrators (the workflow commands like `/gsd-plan-phase` and `/gsd-execute-phase`) spawn agents automatically at the right point in the phase loop. What you see in your session is the orchestrator's progress updates; the agents work in parallel in their own isolated context windows.
+
+## How fresh-context subagents work
+
+When an orchestrator needs to perform heavy work — researching a domain, writing plans, implementing code — it spawns a subagent with a precisely scoped prompt. That subagent receives:
+
+- Its specific agent definition (role, tools, constraints)
+- The subset of planning artifacts it needs for its task
+- A model assignment based on the workflow profile
+
+The subagent runs to completion, writes its output to disk (a `RESEARCH.md`, a `PLAN.md`, a `SUMMARY.md`), and returns a compact result to the orchestrator. The orchestrator's context never grows with the weight of the subagent's work — only the result arrives back.
+
+This architecture is why GSD Core can run four researchers in parallel, spawn multiple executors across wave boundaries, and keep the main session lean throughout a long phase.
+
+## Agent categories
+
+### Researchers
+
+Researchers gather ecosystem knowledge before planning begins. They have web access (WebSearch, WebFetch) and Context7 MCP integration for library documentation. All researchers run in parallel — four instances per invocation, each covering a different dimension of the domain.
+
+<CardGroup cols={2}>
+  <Card title="gsd-phase-researcher" icon="magnifying-glass">
+    Researches how to implement a specific phase. Runs four parallel instances covering stack, features, architecture, and pitfalls. Produces `RESEARCH.md` with a Package Legitimacy Audit table that removes hallucinated or suspicious packages before they reach the planner.
+  </Card>
+  <Card title="gsd-project-researcher" icon="magnifying-glass">
+    Researches domain ecosystem before roadmap creation during `/gsd-new-project`. Produces `STACK.md`, `FEATURES.md`, `ARCHITECTURE.md`, and `PITFALLS.md` in `.planning/research/`.
+  </Card>
+  <Card title="gsd-ui-researcher" icon="palette">
+    Produces UI design contracts for frontend phases during `/gsd-ui-phase`. Detects your design system state (shadcn, Tailwind, existing tokens) and generates `UI-SPEC.md`.
+  </Card>
+  <Card title="gsd-domain-researcher" icon="globe">
+    Researches the business domain and real-world evaluation context for AI integration phases. Surfaces expert rubric ingredients, failure modes, and regulatory context for downstream evaluators.
+  </Card>
+</CardGroup>
+
+### Planners and checkers
+
+Planners create execution plans from the research and context artifacts. Checkers verify plans meet quality standards before any code is written.
+
+<CardGroup cols={2}>
+  <Card title="gsd-planner" icon="list-check">
+    Creates two to three atomic execution plans per phase, reading `PROJECT.md`, `REQUIREMENTS.md`, `CONTEXT.md`, and `RESEARCH.md`. Each plan contains structured `<task>` elements with explicit acceptance criteria, dependency ordering, and requirement traceability. Runs on the Opus model tier for maximum planning quality.
+  </Card>
+  <Card title="gsd-roadmapper" icon="map">
+    Creates the project roadmap during `/gsd-new-project`. Maps every v1 requirement to a phase, derives success criteria, and validates full coverage before presenting the roadmap for your approval.
+  </Card>
+  <Card title="gsd-plan-checker" icon="shield-check">
+    Verifies plans across eight dimensions before execution is permitted: requirement coverage, task atomicity, dependency ordering, file scope, verification commands, context fit, gap detection, and Nyquist compliance. Runs iteratively — up to three revision cycles — until plans pass all dimensions.
+  </Card>
+  <Card title="gsd-research-synthesizer" icon="merge">
+    Combines the outputs of four parallel project researchers into a single `SUMMARY.md` after `/gsd-new-project`. Runs sequentially after all researchers complete.
+  </Card>
+</CardGroup>
+
+### Executors
+
+Executors implement plans. Each executor runs in a fresh context window and produces atomic git commits — one commit per completed task — so the implementation history is granular and recoverable.
+
+<CardGroup cols={1}>
+  <Card title="gsd-executor" icon="play">
+    Implements a single `PLAN.md` file. Reads the plan, the phase `CONTEXT.md` and `RESEARCH.md`, and the project-level `PROJECT.md` and `STATE.md`. Makes one atomic git commit per completed task. Writes a `SUMMARY.md` documenting what was built and any deviations from the plan. Multiple executors run in parallel within each wave; waves are sequenced by plan dependency.
+  </Card>
+</CardGroup>
+
+<Note>
+  The executor is the only agent with `Edit` tool access. It can modify source files. All other agents are read-only against implementation code — they analyze, plan, verify, or audit, but they do not change your code.
+</Note>
+
+### Verifiers and auditors
+
+Verifiers confirm that what was built satisfies the requirements. Auditors check specific quality dimensions like security, test coverage, and UI consistency.
+
+<CardGroup cols={2}>
+  <Card title="gsd-verifier" icon="circle-check">
+    Runs after all executors complete. Performs a goal-backward analysis: checks the codebase against phase goals, runs the test suite, and writes `VERIFICATION.md` with a PASS or FAIL verdict and specific evidence. Also audits test quality — checking for disabled tests, circular test patterns, and weak assertions.
+  </Card>
+  <Card title="gsd-code-reviewer" icon="code">
+    Reviews source files for bugs, security vulnerabilities, and code quality problems. Produces a structured `REVIEW.md` with severity-classified findings. Read-only — never modifies the code it reviews.
+  </Card>
+  <Card title="gsd-security-auditor" icon="lock">
+    Verifies that the threat mitigations declared in your `PLAN.md` threat model are actually present in the implemented code. Does not scan blindly for new vulnerabilities — it verifies declared mitigations only. Supports ASVS levels 1, 2, and 3 for verification depth.
+  </Card>
+  <Card title="gsd-nyquist-auditor" icon="test-tube">
+    Fills test coverage gaps identified by the Nyquist validation pass. Generates test files but never modifies implementation code. Flags implementation bugs as escalations for you to address.
+  </Card>
+</CardGroup>
+
+### Mappers
+
+Mappers explore the codebase and produce structured analysis documents for planning and context.
+
+<CardGroup cols={1}>
+  <Card title="gsd-codebase-mapper" icon="sitemap">
+    Explores your existing codebase and writes seven structured analysis documents to `.planning/codebase/` — stack, architecture, conventions, concerns, structure, testing, and integrations. Runs four parallel instances covering different analysis dimensions. Use this before starting a new project on an existing codebase, or after a phase that significantly restructures the code.
+  </Card>
+</CardGroup>
+
+### Debuggers and specialized agents
+
+<CardGroup cols={2}>
+  <Card title="gsd-debugger" icon="bug">
+    Investigates bugs using a scientific method with persistent session state. Tracks hypotheses, evidence, and eliminated theories across context resets. State is written to `.planning/debug/` and persists until you mark the bug resolved. Appends learnings to a persistent knowledge base on resolution.
+  </Card>
+  <Card title="gsd-assumptions-analyzer" icon="brain">
+    Deeply analyzes the codebase for a phase in assumptions mode (`discuss_mode: assumptions`). Returns structured assumptions with evidence file paths, confidence levels (Confident, Likely, Unclear), and consequences if wrong — so the discussion starts from what the AI observed rather than from scratch.
+  </Card>
+</CardGroup>
+
+## Agent tool permissions
+
+Each agent has access only to the tools it needs for its role. The principle of least privilege keeps agents focused and prevents unintended side effects:
+
+| Agent | Can write code | Can search web | Can edit files |
+|-------|---------------|---------------|----------------|
+| Researchers | No | Yes | No |
+| Planner | No (writes plans only) | No | No |
+| Plan-checker | No | No | No |
+| Executor | **Yes** | No | **Yes** |
+| Verifier | No | No | No |
+| Codebase mapper | No | No | No |
+| Debugger | No | Yes | **Yes** |
+| Security auditor | No | No | No |
+
+Checkers, mappers, and auditors are strictly read-only against implementation source. They analyze and report but never change your code.
+
+## Agent spawn patterns
+
+The table below maps the major workflow commands to the agents they spawn and the parallelism involved:
+
+| Command | Agents spawned | Parallelism |
+|---------|---------------|-------------|
+| `/gsd-new-project` | gsd-project-researcher × 4 → gsd-research-synthesizer → gsd-roadmapper | 4 parallel researchers, then sequential |
+| `/gsd-discuss-phase` | gsd-assumptions-analyzer (assumptions mode only) | Sequential |
+| `/gsd-plan-phase` | gsd-phase-researcher × 4 → gsd-research-synthesizer → gsd-planner → gsd-plan-checker | 4 parallel, then sequential (up to 3 check iterations) |
+| `/gsd-execute-phase` | gsd-executor × N → gsd-verifier | N parallel per wave, then sequential |
+| `/gsd-map-codebase` | gsd-codebase-mapper × 4 | 4 parallel |
+| `/gsd-debug` | gsd-debugger | Sequential, interactive |
+| `/gsd-code-review` | gsd-code-reviewer | Sequential |
+| `/gsd-secure-phase` | gsd-security-auditor | Sequential |

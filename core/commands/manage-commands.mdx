@@ -1,0 +1,482 @@
+---
+title: "GSD Core Management Commands: Config and Workspaces"
+sidebarTitle: "Manage"
+description: "Reference for GSD Core management commands — configuration, skill surfaces, updates, workspaces, workstreams, idea capture, threads, and utility tasks."
+---
+
+The management commands handle everything outside the project lifecycle itself: configuring GSD's behavior, managing parallel workspaces and workstreams, capturing lightweight tasks and ideas, and performing safe housekeeping operations like undo and cleanup. Most of these commands work at the tool or workspace level rather than the phase level.
+
+---
+
+## `/gsd-settings`
+
+Interactive six-section configuration wizard.
+
+**Syntax**
+
+```bash
+/gsd-settings
+```
+
+**What it does**
+
+Opens an interactive multi-section configuration wizard that walks you through GSD settings across six areas: Planning, Execution, Docs & Output, Features, Model & Pipeline, and Misc. Reads the current `config.json`, presents your existing values, merges your answers, and writes the updated config with a confirmation display and quick command references. Use `/gsd-config` for advanced knobs and integration settings.
+
+---
+
+## `/gsd-config`
+
+Configure GSD settings — common toggles, advanced knobs, integrations, and model profiles.
+
+**Syntax**
+
+```bash
+/gsd-config
+/gsd-config --advanced
+/gsd-config --integrations
+/gsd-config --profile quality
+```
+
+**What it does**
+
+Consolidated configuration command with mode routing. Without a flag it runs the same interactive multi-section configuration wizard as `/gsd-settings`. With `--advanced` it exposes power-user knobs across planning, execution, discussion, cross-AI, git, and runtime settings. With `--integrations` it manages third-party API keys, code-review CLI routing, and agent-skill injection. With `--profile` it switches your model profile without any interactive prompts.
+
+**Flags**
+
+<ParamField query="--advanced" type="flag">
+  Open the advanced settings wizard covering planning granularity, timeouts, branch templates, cross-AI execution configuration, and runtime tuning.
+</ParamField>
+
+<ParamField query="--integrations" type="flag">
+  Open the integrations settings wizard covering API keys (Brave, Firecrawl, Exa), review CLI routing, and agent-skill injection configuration.
+</ParamField>
+
+<ParamField query="--profile [name]" type="string">
+  Switch the active model profile without interactive prompts. Accepted values: `quality`, `balanced`, `budget`, `inherit`.
+</ParamField>
+
+---
+
+## `/gsd-surface`
+
+Toggle which skill commands are surfaced without reinstalling GSD.
+
+**Syntax**
+
+```bash
+/gsd-surface list
+/gsd-surface status
+/gsd-surface profile standard
+/gsd-surface disable utility
+/gsd-surface enable audit_review
+/gsd-surface reset
+```
+
+**What it does**
+
+Manages the runtime skill surface by reading and writing `~/.claude/.gsd-surface.json` and re-staging the active skills directory in place. Use this to reduce context token usage from skill definitions by disabling clusters you don't need, or to switch between surface profiles.
+
+**Valid cluster names:** `core_loop`, `audit_review`, `milestone`, `research_ideate`, `workspace_state`, `docs`, `ui`, `ai_eval`, `ns_meta`, `utility`
+
+**Subcommands**
+
+<ParamField query="list" type="string">
+  Show all enabled and disabled clusters and skills with their approximate token cost.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Alias for `list`, plus a summary of the base profile and install-time profile.
+</ParamField>
+
+<ParamField query="profile [name]" type="string">
+  Switch the base surface profile. Accepted values: `core`, `standard`, `full`. Comma-separate profile names to compose multiple profiles (no spaces), e.g., `profile core,audit_review`.
+</ParamField>
+
+<ParamField query="disable [cluster]" type="string">
+  Add a cluster to the disabled list and immediately remove its skills from the active surface.
+</ParamField>
+
+<ParamField query="enable [cluster]" type="string">
+  Remove a cluster from the disabled list and restore its skills to the active surface.
+</ParamField>
+
+<ParamField query="reset" type="string">
+  Delete `.gsd-surface.json` and return to the install-time profile defaults.
+</ParamField>
+
+---
+
+## `/gsd-update`
+
+Update GSD to the latest version with changelog display.
+
+**Syntax**
+
+```bash
+/gsd-update
+/gsd-update --sync
+/gsd-update --reapply
+/gsd-update --next
+```
+
+**What it does**
+
+Checks for a new version of GSD, fetches and displays the changelog, prompts for confirmation, then runs the update, clears caches, and reminds you to restart. Handles both local and global installations. Without a flag it targets `@latest`.
+
+**Flags**
+
+<ParamField query="--sync" type="flag">
+  Sync managed GSD skills across all runtime roots. Use after an update if you work across multiple runtimes and want to keep skill definitions aligned. Supports `--from`, `--to`, `--dry-run`, and `--apply` sub-flags.
+</ParamField>
+
+<ParamField query="--reapply" type="flag">
+  Reapply local modifications after a GSD update. Performs a three-way merge between the pristine baseline, your user-modified backup, and the newly installed version to recover your customizations.
+</ParamField>
+
+<ParamField query="--next" type="flag">
+  Target the `@next` release-candidate dist-tag instead of `@latest`. Use to install or refresh a release candidate (e.g., `1.4.0-rc.1`). Also accepted as `--rc`.
+</ParamField>
+
+---
+
+## `/gsd-workspace`
+
+Manage isolated GSD workspace environments.
+
+**Syntax**
+
+```bash
+/gsd-workspace --new
+/gsd-workspace --new --name feature-x --repos myrepo --strategy worktree
+/gsd-workspace --list
+/gsd-workspace --remove feature-x
+```
+
+**What it does**
+
+Creates, lists, and removes isolated workspace environments — each with independent `.planning/` directories and repo copies. Workspaces use either a git worktree strategy (faster, shares object store) or a full clone strategy (fully isolated, higher disk usage).
+
+**Flags**
+
+<ParamField query="--new" type="flag">
+  Create a new isolated workspace. Combine with `--name`, `--repos`, and `--strategy` to configure it.
+</ParamField>
+
+<ParamField query="--list" type="flag">
+  List all active GSD workspaces in `~/gsd-workspaces/` with their status and current phase.
+</ParamField>
+
+<ParamField query="--remove" type="flag">
+  Remove a named workspace and clean up any associated worktrees. Pass the workspace name as the next argument.
+</ParamField>
+
+<ParamField query="--name [name]" type="string">
+  Name for the new workspace. Used with `--new`.
+</ParamField>
+
+<ParamField query="--repos [repos]" type="string">
+  Comma-separated list of repositories to include in the workspace. Used with `--new`.
+</ParamField>
+
+<ParamField query="--strategy [strategy]" type="string">
+  Isolation strategy for the new workspace. Accepted values:
+  - `worktree` — git worktree (faster, shares object store)
+  - `clone` — full clone (fully isolated, higher disk usage)
+</ParamField>
+
+---
+
+## `/gsd-workstreams`
+
+Manage parallel workstreams for concurrent milestone work.
+
+**Syntax**
+
+```bash
+/gsd-workstreams list
+/gsd-workstreams create payments
+/gsd-workstreams status payments
+/gsd-workstreams switch payments
+/gsd-workstreams progress
+/gsd-workstreams complete payments
+/gsd-workstreams resume payments
+```
+
+**What it does**
+
+Manages parallel workstreams that let multiple milestone tracks run concurrently. Each workstream is an isolated context with its own phase state. Switching workstreams sets the active context for subsequent GSD commands. Completing a workstream archives it to `milestones/`. Defaults to `list` when no subcommand is provided.
+
+**Subcommands**
+
+<ParamField query="list" type="string">
+  List all workstreams with name, status, current phase, and progress.
+</ParamField>
+
+<ParamField query="create [name]" type="string">
+  Create a new workstream. After creation, run `/gsd-new-milestone --ws [name]` to set up its milestone.
+</ParamField>
+
+<ParamField query="status [name]" type="string">
+  Show detailed phase breakdown and state information for the named workstream.
+</ParamField>
+
+<ParamField query="switch [name]" type="string">
+  Set the named workstream as active for the current session.
+</ParamField>
+
+<ParamField query="progress" type="string">
+  Show a progress summary across all workstreams.
+</ParamField>
+
+<ParamField query="complete [name]" type="string">
+  Archive the named workstream to `milestones/`.
+</ParamField>
+
+<ParamField query="resume [name]" type="string">
+  Set the named workstream as active and prompt you to run `/gsd-resume-work --ws [name]`.
+</ParamField>
+
+---
+
+## `/gsd-capture`
+
+Capture ideas, tasks, notes, and seeds to their destination.
+
+**Syntax**
+
+```bash
+/gsd-capture "refactor the auth module to use JWTs"
+/gsd-capture --note "talked to design team — they want rounded corners"
+/gsd-capture --backlog "add dark mode support"
+/gsd-capture --seed "migrate to Rust when team grows"
+/gsd-capture --list
+```
+
+**What it does**
+
+Routes a captured item to the right destination in the GSD system based on the flag you use. Without a flag it creates a structured todo. With `--note` it appends a timestamped note. With `--backlog` it adds to the ROADMAP.md backlog section with 999.x numbering. With `--seed` it plants a forward-looking idea with trigger conditions in `.planning/seeds/`.
+
+**Flags**
+
+<ParamField query="(no flag)" type="string">
+  Create a structured todo in `.planning/todos/`.
+</ParamField>
+
+<ParamField query="--note [text]" type="string">
+  Zero-friction idea capture. Appends a timestamped note, lists existing notes, or promotes a note to a todo or phase.
+</ParamField>
+
+<ParamField query="--backlog [text]" type="string">
+  Add an idea to the ROADMAP.md backlog parking lot with 999.x phase numbering.
+</ParamField>
+
+<ParamField query="--seed [text]" type="string">
+  Capture a forward-looking idea with trigger conditions as `.planning/seeds/SEED-NNN-slug.md`.
+</ParamField>
+
+<ParamField query="--list" type="flag">
+  Open an interactive todo browser and action router for pending todos.
+</ParamField>
+
+---
+
+## `/gsd-thread`
+
+Manage persistent context threads for cross-session work.
+
+**Syntax**
+
+```bash
+/gsd-thread "investigating the N+1 query in orders"
+/gsd-thread list
+/gsd-thread list --open
+/gsd-thread list --resolved
+/gsd-thread status auth-refactor
+/gsd-thread close auth-refactor
+/gsd-thread resume auth-refactor
+```
+
+**What it does**
+
+Creates, lists, closes, and resumes persistent context threads — lightweight cross-session knowledge stores for work that spans multiple sessions but doesn't belong to any specific phase. Threads keep a named context alive so you can return to it without losing track of where you left off.
+
+**Subcommands**
+
+<ParamField query="list" type="string">
+  List all threads. Add `--open` to show only open threads, or `--resolved` to show only closed ones.
+</ParamField>
+
+<ParamField query="status [slug]" type="string">
+  Show the current status and context summary for a thread identified by its slug.
+</ParamField>
+
+<ParamField query="close [slug]" type="string">
+  Mark a thread as resolved.
+</ParamField>
+
+<ParamField query="resume [slug]" type="string">
+  Resume a thread by restoring its context into the current session.
+</ParamField>
+
+---
+
+## `/gsd-quick`
+
+Execute an ad-hoc task with GSD guarantees but skip optional agents.
+
+**Syntax**
+
+```bash
+/gsd-quick "add rate limiting to the upload endpoint"
+/gsd-quick "fix flaky test in auth suite" --validate
+/gsd-quick "update CORS headers" --discuss
+/gsd-quick "investigate caching options" --research
+/gsd-quick "add pagination to the orders API" --full
+/gsd-quick list
+/gsd-quick status upload-rate-limit
+/gsd-quick resume upload-rate-limit
+```
+
+**What it does**
+
+Executes small, ad-hoc tasks with GSD guarantees — atomic commits, `STATE.md` tracking — using a shorter pipeline than full phase execution. Quick tasks live in `.planning/quick/` and update the "Quick Tasks Completed" table in `STATE.md`, not `ROADMAP.md`. By default, research, discussion, plan-checking, and verification agents are all skipped.
+
+**Flags**
+
+<ParamField query="--full" type="flag">
+  Enable the complete quality pipeline: discussion + research + plan-checking + post-execution verification. One flag for everything.
+</ParamField>
+
+<ParamField query="--validate" type="flag">
+  Enable plan-checking (max 2 iterations) and post-execution verification only, without discussion or research.
+</ParamField>
+
+<ParamField query="--discuss" type="flag">
+  Run a lightweight discussion phase before planning to surface assumptions and clarify gray areas.
+</ParamField>
+
+<ParamField query="--research" type="flag">
+  Spawn a focused research agent before planning to investigate implementation approaches, library options, and pitfalls.
+</ParamField>
+
+**Subcommands**
+
+<ParamField query="list" type="string">
+  List all quick tasks with slug, date, and status (complete, in-progress, or abandoned).
+</ParamField>
+
+<ParamField query="status [slug]" type="string">
+  Show the status, plan description, and last action for a specific quick task by slug.
+</ParamField>
+
+<ParamField query="resume [slug]" type="string">
+  Resume a specific in-progress quick task by slug, restoring plan context and continuing execution.
+</ParamField>
+
+---
+
+## `/gsd-fast [task]`
+
+Execute a trivial inline task with no planning overhead.
+
+**Syntax**
+
+```bash
+/gsd-fast "fix typo in README"
+/gsd-fast "bump version to 1.2.1 in package.json"
+/gsd-fast "add missing semicolons in config.ts"
+```
+
+**What it does**
+
+Executes a trivial task directly in the current context without spawning subagents or generating any plan files. Designed for tasks you can describe in one sentence and execute in under two minutes — typo fixes, config tweaks, small refactors, forgotten commits, simple additions. Use `/gsd-quick` for anything that needs research, multi-step planning, or verification.
+
+---
+
+## `/gsd-undo`
+
+Safe git revert for phase and plan commits.
+
+**Syntax**
+
+```bash
+/gsd-undo --last 5
+/gsd-undo --phase 03
+/gsd-undo --plan 03-02
+```
+
+**What it does**
+
+Rolls back GSD phase or plan commits safely using the phase manifest, with dependency checks and a mandatory confirmation gate before execution. Shows you exactly what will be reverted and warns about downstream phases that depend on the work you're about to undo.
+
+**Flags**
+
+<ParamField query="--last N" type="number">
+  Show the most recent `N` GSD commits for interactive selection. You choose which to revert from the list.
+</ParamField>
+
+<ParamField query="--phase NN" type="string">
+  Revert all commits for phase `NN`. Uses the phase manifest first, then falls back to git log pattern matching.
+</ParamField>
+
+<ParamField query="--plan NN-MM" type="string">
+  Revert all commits for a specific plan identified by phase number and plan number (e.g., `03-02` for phase 3, plan 2).
+</ParamField>
+
+---
+
+## `/gsd-cleanup`
+
+Archive phase directories and prune stale branches.
+
+**Syntax**
+
+```bash
+/gsd-cleanup
+```
+
+**What it does**
+
+Archives phase directories from completed milestones into `.planning/milestones/v{X.Y}-phases/`. Use this when `.planning/phases/` has accumulated directories from past milestones and you want to keep the working directory clean. Always shows you a dry-run summary of what will be moved and waits for confirmation before archiving.
+
+---
+
+## `/gsd-help`
+
+Show available GSD commands and usage guidance.
+
+**Syntax**
+
+```bash
+/gsd-help
+/gsd-help --brief
+/gsd-help --full
+/gsd-help workflow
+/gsd-help --brief ship
+```
+
+**What it does**
+
+Displays GSD reference content at the tier you request. Output is strictly reference material — no project-specific analysis, git status, file context, or next-step suggestions are included.
+
+**Flags**
+
+<ParamField query="(no flag)" type="string">
+  One-page tour of all GSD commands with short descriptions and common usage patterns.
+</ParamField>
+
+<ParamField query="--brief" type="flag">
+  Single-line refresher per command. Fastest lookup when you just need a syntax reminder.
+</ParamField>
+
+<ParamField query="--full" type="flag">
+  Complete reference output covering every command, every flag, and all usage notes.
+</ParamField>
+
+<ParamField query="[topic]" type="string">
+  Display the reference section for a single topic, e.g., `/gsd-help workflow` or `/gsd-help ship`.
+</ParamField>
+
+<ParamField query="--brief [topic]" type="string">
+  Signature plus a one-line summary for a single topic. Compact scoped lookup — e.g., `/gsd-help --brief plan-phase`.
+</ParamField>

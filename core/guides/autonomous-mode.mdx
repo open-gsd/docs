@@ -1,0 +1,126 @@
+---
+title: "Running GSD Core Autonomously Without Intervention"
+sidebarTitle: "Autonomous Mode"
+description: "Run all remaining phases hands-free with /gsd-autonomous, oversee parallel phases with /gsd-manager, and configure auto-advance in config.json."
+---
+
+GSD Core is designed to run without you watching every step. Autonomous mode lets you fire off an entire multi-phase delivery and come back when it is done, or use the interactive manager to oversee parallel phase work from a single terminal. Understanding when to use each mode — and how to keep human checkpoints when you need them — is the key to getting the most out of GSD Core's parallelization.
+
+## /gsd-autonomous — hands-free phase execution
+
+Run `/gsd-autonomous` to execute all remaining phases in your roadmap without any human intervention. GSD runs each phase through the full discuss → plan → execute → verify loop in sequence, skipping phases that are already complete.
+
+```bash
+/gsd-autonomous                     # Run all remaining phases
+/gsd-autonomous --from 3            # Start from phase 3
+/gsd-autonomous --to 5              # Run up to and including phase 5
+/gsd-autonomous --from 3 --to 5     # Run phases 3 through 5
+/gsd-autonomous --only 4            # Run only phase 4
+/gsd-autonomous --interactive       # Answer discuss questions inline; plan and execute run as background agents
+```
+
+<Accordion title="Flag reference">
+  | Flag | Effect |
+  |------|--------|
+  | `--from N` | Start autonomous execution from phase N; phases before N are skipped |
+  | `--to N` | Stop after completing phase N |
+  | `--only N` | Execute only phase N in single-phase mode |
+  | `--interactive` | Run discuss inline with user input, then dispatch plan and execute as background agents |
+</Accordion>
+
+<Warning>
+  `/gsd-autonomous` without `--interactive` commits code and advances STATE.md without asking for confirmation at each phase. Review your ROADMAP.md and REQUIREMENTS.md carefully before running fully autonomous mode on a project for the first time.
+</Warning>
+
+## /gsd-manager — interactive multi-phase command center
+
+Run `/gsd-manager` to open a dashboard that shows the status of all phases and lets you dispatch work to individual phases from a single terminal. Unlike `/gsd-autonomous`, the manager does not run phases sequentially on its own — it gives you a visual command center to orchestrate phase work interactively.
+
+```bash
+/gsd-manager                        # Open the command center dashboard
+/gsd-manager --analyze-deps         # Scan ROADMAP for phase dependencies before parallel execution
+```
+
+<Accordion title="How the manager dispatches work">
+  The manager runs discuss-phase commands inline in the terminal so you can answer questions directly. Plan and execute commands run as background agents, emitting `[checkpoint]` markers at every wave and plan boundary so the stream never times out on long-running phases. If a background phase fails partway through, look for `[checkpoint]` in the transcript to identify the last confirmed wave boundary and resume from there.
+</Accordion>
+
+You can configure per-step flags that the manager appends automatically to every dispatched command:
+
+```json
+{
+  "manager": {
+    "flags": {
+      "discuss": "--auto",
+      "plan": "--skip-research",
+      "execute": "--validate"
+    }
+  }
+}
+```
+
+## Auto-advance via config
+
+Set `workflow.auto_advance: true` in `.planning/config.json` to automatically chain discuss → plan → execute without stopping between steps. This is a project-level toggle — once set, every phase command that completes successfully will immediately invoke the next step.
+
+```json
+{
+  "workflow": {
+    "auto_advance": true
+  }
+}
+```
+
+Enable or disable it interactively via `/gsd-settings` or `/gsd-config`:
+
+```bash
+/gsd-settings       # Interactive six-section configuration wizard
+/gsd-config         # Focused interactive config for common toggles
+```
+
+## When to use autonomous vs interactive mode
+
+Choosing the right mode depends on how much confidence you have in your requirements and how much you want to inspect intermediate artifacts.
+
+<CardGroup cols={2}>
+  <Card title="Use autonomous mode when…" icon="robot">
+    - Your requirements and ROADMAP are well-defined and stable
+    - You are running repeated phases on a familiar domain
+    - You want to leave work running overnight or between sessions
+    - The project is in a `yolo` mode prototype and speed matters more than review
+  </Card>
+  <Card title="Use interactive mode when…" icon="user">
+    - You are working on a novel architecture or unfamiliar domain
+    - Your requirements have open questions that need human judgment
+    - Each phase has significant infrastructure changes worth reviewing
+    - You want to run cross-AI review between discuss and plan
+  </Card>
+</CardGroup>
+
+## Keeping human checkpoints with --interactive
+
+The `--interactive` flag on `/gsd-autonomous` strikes a balance between automation and oversight. GSD runs the discuss step inline so you can answer questions directly, then dispatches plan and execute as background agents. This keeps the main context lean while preserving your input on implementation decisions before any code is written.
+
+```bash
+/gsd-autonomous --interactive       # Discuss inline, plan and execute as background agents
+```
+
+<Tip>
+  Combine `--interactive` with `--from N` to let earlier phases run fully autonomous while you stay hands-on for a specific phase range: `/gsd-autonomous --from 4 --to 6 --interactive`.
+</Tip>
+
+## Discuss-phase skip for fully captured projects
+
+If your PROJECT.md and REQUIREMENTS.md already capture all developer preferences and implementation decisions, skip the discuss step entirely by setting `workflow.skip_discuss: true`. GSD will write a minimal CONTEXT.md from the ROADMAP phase goal and proceed directly to planning.
+
+```json
+{
+  "workflow": {
+    "skip_discuss": true
+  }
+}
+```
+
+<Note>
+  `skip_discuss` only affects `/gsd-autonomous`. Running `/gsd-discuss-phase` directly always runs the full session regardless of this setting.
+</Note>

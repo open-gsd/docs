@@ -1,0 +1,345 @@
+---
+title: "GSD Browser MCP Server: Connect AI Agents via MCP"
+sidebarTitle: "MCP Server"
+description: "Run gsd-browser mcp to expose 50+ automation tools, live resources, and executable prompts to Cursor, Claude Desktop, or any MCP-compatible AI agent."
+---
+
+The MCP server is the recommended path for connecting AI agents to GSD Browser. Running `gsd-browser mcp` starts a Model Context Protocol server that exposes the entire daemon surface — navigation, interaction, snapshots, recordings, vault, network control, and more — as over 50 discoverable tools, live resources, and executable prompts. Any MCP-compatible client connects to it with a single configuration block and immediately gains access to the full browser automation platform.
+
+## Start the MCP server
+
+<Tabs>
+  <Tab title="Local stdio (recommended)">
+    Most MCP clients manage the server process for you. Point your client at `gsd-browser mcp` and it handles startup, shutdown, and restarts automatically.
+
+    ```bash
+    gsd-browser mcp
+    ```
+
+    The server communicates over stdin/stdout using the JSON-RPC MCP protocol. The daemon starts automatically when the first tool call arrives.
+  </Tab>
+  <Tab title="HTTP server (remote / cloud)">
+    Run the MCP surface over Streamable HTTP for hosted or cloud deployments. Generate a token and bind to a public interface:
+
+    ```bash
+    export GSD_BROWSER_MCP_AUTH_TOKEN="$(openssl rand -hex 32)"
+    gsd-browser mcp --http --host 0.0.0.0 --port 8788
+    ```
+
+    Expose the service over HTTPS via your proxy or platform, then point remote clients at:
+
+    ```
+    https://your-domain.example/mcp
+    Authorization: Bearer <GSD_BROWSER_MCP_AUTH_TOKEN>
+    ```
+
+    For local development without auth (loopback only):
+
+    ```bash
+    gsd-browser mcp --http --host 127.0.0.1 --port 8788
+    ```
+
+    <Warning>
+      Non-loopback hosts refuse unauthenticated startup by default. Pass `--no-auth` only when you have intentionally secured the endpoint at the network layer.
+    </Warning>
+  </Tab>
+  <Tab title="OpenGSD cloud tokens">
+    To use OpenGSD console tokens with per-request usage tallying, set the verifier URL before starting:
+
+    ```bash
+    export GSD_BROWSER_MCP_AUTH_VERIFY_URL="https://mcp.opengsd.dev/api/mcp/tokens/verify"
+    gsd-browser mcp --http --host 0.0.0.0 --port 8788
+    ```
+
+    The server validates each request against the console, counts `tools/call` requests against the user's quota, and forwards throttle responses when the console returns `429`.
+  </Tab>
+</Tabs>
+
+## Tool categories
+
+The MCP server exposes 50+ tools grouped into logical categories. Call `tools/list` from any connected client to see the current full surface.
+
+<AccordionGroup>
+  <Accordion title="Navigation & page state">
+    `browser_navigate`, `browser_back`, `browser_forward`, `browser_reload`, `browser_wait_for` — control page navigation and wait for conditions like `network_idle`, `selector_visible`, `url_contains`, and `region_stable`.
+  </Accordion>
+
+  <Accordion title="Snapshot & versioned refs">
+    `browser_snapshot`, `browser_get_ref` — scan the page and assign versioned refs (`@v1:e1`), then inspect individual refs for bounding boxes, ARIA data, and structural signatures. The primary mechanism for reliable interaction. See [Snapshots & Refs](/browser/concepts/snapshots-refs).
+  </Accordion>
+
+  <Accordion title="Interaction">
+    `browser_click_ref`, `browser_fill_ref`, `browser_hover_ref`, `browser_click`, `browser_type`, `browser_press`, `browser_scroll`, `browser_drag`, `browser_select_option`, `browser_set_checked`, `browser_upload_file`, `browser_set_viewport` — precise element interaction using refs or CSS selectors.
+  </Accordion>
+
+  <Accordion title="Semantic & intent-based tools">
+    `browser_act`, `browser_act_instruction`, `browser_find_best` — natural language intent execution. `browser_act` covers 15 built-in patterns (fill email, fill password, submit form, accept cookies, click next, dismiss dialog, open menu, and more). `browser_act_instruction` accepts a free-form instruction like `"click Continue"` or `"enter alice@example.com into Email"` and plans concrete primitive steps against the live page — use it when the intent isn't a built-in pattern. Both tools share the self-healing action cache. See [Free-form instructions with `browser_act_instruction`](#free-form-instructions-with-browser-act-instruction).
+  </Accordion>
+
+  <Accordion title="Forms">
+    `browser_analyze_form`, `browser_fill_form` — inspect a form's structure and fill multiple fields in one call using labels, name attributes, or ARIA identifiers.
+  </Accordion>
+
+  <Accordion title="Capture & visual output">
+    `browser_screenshot`, `browser_zoom_region`, `browser_save_pdf`, `browser_visual_diff` — capture screenshots, zoom into regions, export PDFs, and run visual regression comparisons against a stored baseline.
+  </Accordion>
+
+  <Accordion title="Live viewer & human collaboration">
+    `browser_view`, `browser_goal`, `browser_takeover`, `browser_release_control`, `browser_annotation_request`, `browser_step`, `browser_abort`, `browser_pause`, `browser_resume`, `browser_sensitive_on`, `browser_sensitive_off` — open the authenticated viewer, set goal banners, let a human take over and annotate, then hand control back to the agent.
+  </Accordion>
+
+  <Accordion title="Recording & evidence bundles">
+    `browser_record_start`, `browser_record_stop`, `browser_recordings`, `browser_recording_export`, `browser_recording_validate`, `browser_generate_replayable_test` — capture flows as rich, redacted evidence bundles and auto-convert them to commit-ready Playwright regression tests.
+  </Accordion>
+
+  <Accordion title="Session management">
+    `browser_session_list`, `browser_session_new`, `browser_session_close`, `browser_session_save`, `browser_session_restore` — manage isolated browser contexts. See [Sessions](/browser/concepts/sessions).
+  </Accordion>
+
+  <Accordion title="Network control">
+    `browser_mock_route`, `browser_block_urls`, `browser_clear_routes`, `browser_har_export`, `browser_trace_start`, `browser_trace_stop` — intercept and mock requests, block URLs, export HAR files, and start CDP traces.
+  </Accordion>
+
+  <Accordion title="Auth vault & state persistence">
+    `browser_vault_save`, `browser_vault_login`, `browser_vault_list`, `browser_save_state`, `browser_restore_state` — store encrypted credentials and persist full browser state across sessions for repeatable authenticated flows.
+  </Accordion>
+
+  <Accordion title="Diagnostics & debugging">
+    `browser_console`, `browser_network`, `browser_timeline`, `browser_debug_bundle`, `browser_session_summary`, `browser_check_injection` — inspect console logs, network traffic, the action timeline, and get a full debug bundle (screenshot + console + network + a11y) when an agent gets stuck.
+  </Accordion>
+
+  <Accordion title="Multi-tab & frame management">
+    `browser_list_pages`, `browser_switch_page`, `browser_close_page`, `browser_list_frames`, `browser_select_frame` — manage multiple tabs opened by navigation or JavaScript, and work inside iframes.
+  </Accordion>
+
+  <Accordion title="Batch execution">
+    `browser_batch` — run a sequence of actions atomically in a single round-trip. Highly recommended for complex multi-step flows where partial state errors must be avoided. Supported step actions include `navigate`, `reload`, `click`, `type`, `select_option`, `key_press`, `press`, `wait_for`, `assert`, `click_ref`, `fill_ref`, `hover`, `hover_ref`, `scroll`, `snapshot`, and `diff`.
+  </Accordion>
+
+  <Accordion title="Action cache">
+    `browser_action_cache` (stats / get / put / clear) — inspect, populate, and manage the self-healing intent-to-selector cache. See [Snapshots & Refs](/browser/concepts/snapshots-refs).
+  </Accordion>
+</AccordionGroup>
+
+## Reloading the current page with `browser_reload`
+
+`browser_reload` exposes the daemon's native page reload as an MCP tool. Use it to refresh dynamic content (long-polled dashboards, "load more" lists that need to restart from a clean state) or to recover from a stale page after an error. It returns the same structured page state as `browser_navigate`, so agents can branch on the response in the same way.
+
+Reload only takes an optional `session` argument:
+
+```json
+{
+  "name": "browser_reload",
+  "arguments": {
+    "session": "checkout-flow"
+  }
+}
+```
+
+Always follow `browser_reload` with `browser_snapshot` before interacting with elements — refs from the previous page version are no longer valid.
+
+Inside `browser_batch`, use the `reload` step instead of a separate tool call so the reload stays in the same atomic round-trip:
+
+```json
+{
+  "name": "browser_batch",
+  "arguments": {
+    "steps": [
+      { "action": "navigate", "url": "https://example.com/orders" },
+      { "action": "reload" },
+      { "action": "wait_for", "condition": "selector_visible", "value": "#orders-table" },
+      { "action": "snapshot" }
+    ]
+  }
+}
+```
+
+## Free-form instructions with `browser_act_instruction`
+
+`browser_act_instruction` accepts a short natural-language instruction, plans concrete primitive steps against the live DOM, and dispatches them through the same engine that powers `browser_click`, `browser_type`, `browser_select_option`, `browser_set_checked`, `browser_drag`, and `browser_scroll`. Reach for it when the action isn't one of the built-in `browser_act` semantic patterns — for example "choose California from State", "drag the price slider to the right", or "scroll the comments panel down".
+
+The tool accepts:
+
+| Field | Type | Description |
+|---|---|---|
+| `instruction` | string (required) | Short action-oriented instruction, e.g. `"click Continue"`, `"enter 'alice@example.com' into Email"`, `"choose California from State"`. |
+| `dry_run` | boolean | When `true`, return the planned steps and confidence without executing them. Defaults to `false`. |
+| `scope` | string | CSS selector that constrains planning to a form, dialog, panel, or other page region. Use this when a page has repeated controls (e.g. multiple "Save" buttons). |
+| `min_confidence` | number | Block execution when the inferred plan confidence is below this threshold. Use this to fail closed on ambiguous instructions instead of guessing. |
+| `max_steps` | integer | Cap on primitive steps the instruction may execute. Defaults to a small bounded sequence. |
+| `session` | string | Named session for parallel browser instances. |
+
+A typical guarded execution looks like this:
+
+```json
+{
+  "name": "browser_act_instruction",
+  "arguments": {
+    "instruction": "enter 'alice@example.com' into Email",
+    "scope": "#signup-form",
+    "min_confidence": 0.7
+  }
+}
+```
+
+To inspect the plan before committing — useful when an instruction might select the wrong control on a dense page — pass `dry_run: true`:
+
+```json
+{
+  "name": "browser_act_instruction",
+  "arguments": {
+    "instruction": "click the second 'Delete' button",
+    "scope": "#row-42",
+    "dry_run": true
+  }
+}
+```
+
+The response contains the inferred primitive (`click`, `type`, `select_option`, …), the target element, and a confidence score. If the plan looks correct, re-issue the call without `dry_run` to execute it. If confidence is low or the target is wrong, tighten `scope` or rewrite the instruction.
+
+<Tip>
+  Prefer `browser_act` first for the 15 built-in semantic patterns (`fill_email`, `submit_form`, `accept_cookies`, etc.) — they are faster and benefit from the action cache. Fall back to `browser_act_instruction` when the action isn't a built-in pattern, and to ref-based primitives (`browser_click_ref`, `browser_fill_ref`) when you need exact pixel-perfect control.
+</Tip>
+
+## Resources
+
+Resources give your agent live context without issuing a full tool call. Read them in your agent loop after navigation to get up-to-date page state cheaply.
+
+| Resource URI | What it returns |
+|---|---|
+| `gsd-browser://latest-snapshot` | Triggers a fresh snapshot and returns versioned refs + page structure |
+| `gsd-browser://current-state` | Full debug bundle: screenshot, console, network, timeline, a11y |
+| `gsd-browser://active-recordings` | List of in-progress recording bundles |
+| `gsd-browser://timeline` | Recent action timeline |
+| `gsd-browser://current-refs` | The refs from the most recent snapshot, without re-scanning |
+
+## Executable prompts
+
+Built-in prompts are multi-step executable workflows that encode the [agent best practices](https://github.com/open-gsd/gsd-browser/blob/main/docs/AGENT-BEST-PRACTICES.md) directly. Ask your MCP client to run them by name.
+
+| Prompt | What it does |
+|---|---|
+| `robust_login_flow` | Navigates to a login page, fills credentials, submits, asserts the logged-in state, and saves the session |
+| `full_page_audit` | Runs snapshot, console, network, visual diff, and debug bundle in parallel and synthesizes the results |
+| `create_evidence_bundle` | Records a flow with annotations and exports a redacted, replayable bundle |
+| `evidence_creation_workflow` | Full record → export → generate Playwright test pipeline |
+| `autonomous_research_task` | Open-ended research flow with structured extraction and evidence capture |
+| `debug_stuck_agent_flow` | Collects debug bundle, console, network, and timeline to diagnose a stuck agent |
+
+## Response envelopes
+
+Every `tools/call` response from the MCP server includes a standardized envelope:
+
+```json
+{
+  "summary": "Clicked @v2:e2 — button 'Search'",
+  "structured_data": { ... },
+  "suggested_next_actions": [
+    "Call browser_wait_for with condition network_idle",
+    "Re-snapshot to get fresh refs after navigation"
+  ],
+  "evidence_refs": ["recording://rec_abc123"],
+  "raw_fallback": "..."
+}
+```
+
+Follow the `suggested_next_actions` on every call — they contain high-signal hints that significantly reduce the number of round-trips an agent needs to complete a task.
+
+## Client configuration
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Add the following to your Claude Desktop MCP configuration file (`.mcp.json` or `claude_desktop_config.json`):
+
+    ```json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "command": "gsd-browser",
+          "args": ["mcp"]
+        }
+      }
+    }
+    ```
+
+    To pre-configure the browser path and vault key:
+
+    ```json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "command": "gsd-browser",
+          "args": ["mcp"],
+          "env": {
+            "GSD_BROWSER_BROWSER_PATH": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "GSD_BROWSER_VAULT_KEY": "your-strong-key-here"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Cursor / VS Code">
+    Add the MCP server in Cursor's `mcp.json` or VS Code's MCP settings. The configuration format is the same as Claude Desktop:
+
+    ```json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "command": "gsd-browser",
+          "args": ["mcp"],
+          "env": {
+            "GSD_BROWSER_BROWSER_PATH": "/usr/bin/chromium",
+            "GSD_BROWSER_VAULT_KEY": "your-strong-key-here"
+          }
+        }
+      }
+    }
+    ```
+
+    For a named session per project (strongly recommended), add the session flag to `args`:
+
+    ```json
+    "args": ["mcp", "--session", "my-project"]
+    ```
+  </Tab>
+  <Tab title="Remote / cloud">
+    For remote agents pointing at a hosted HTTP server:
+
+    ```json
+    {
+      "mcpServers": {
+        "gsd-browser": {
+          "transport": "http",
+          "url": "https://your-domain.example/mcp",
+          "headers": {
+            "Authorization": "Bearer YOUR_TOKEN_HERE"
+          }
+        }
+      }
+    }
+    ```
+
+    <Note>
+      Cloud instances that use OpenGSD console tokens require a valid token from the OpenGSD console. Each `tools/call` request is validated and counted against the token's quota.
+    </Note>
+  </Tab>
+</Tabs>
+
+<Tip>
+  If you have cloned the gsd-browser repository, run `./scripts/mcp-quickstart.sh cursor` (or `claude` / `vscode` / `generic`) for tailored setup instructions and copy-paste config snippets for your specific client.
+</Tip>
+
+## How the MCP adapter works
+
+The MCP server is a thin, high-fidelity adapter over the same daemon client that the CLI uses. When your agent calls a tool, the server translates the JSON-RPC request directly to the daemon's internal API, attaches the standardized response envelope, and returns the result. You get automatic daemon lifecycle management, named session routing, and all the reliability guarantees of the CLI — plus the discoverability and structured envelopes that MCP provides.
+
+```
+MCP Client (Cursor / Claude / VS Code)
+      │  JSON-RPC over stdio or HTTP
+      ▼
+gsd-browser mcp  ──────────────────────────────────────────────────────►  daemon  ──►  Chrome
+  (thin adapter)        (same daemon client as CLI)
+```
+
+This architecture means the entire 90+ command CLI surface is available through MCP — the 50+ exposed tools are the highest-value subset curated for agent workflows, with agent-optimized descriptions and envelopes added on top.

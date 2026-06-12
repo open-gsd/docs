@@ -1,0 +1,169 @@
+---
+title: "GSD Core Planning Artifacts and Directory Structure"
+sidebarTitle: "Planning Artifacts"
+description: "Learn what every file in .planning/ contains, how per-phase artifacts are organized, and how each document feeds into the next stage of the workflow."
+---
+
+GSD Core stores all project state in a `.planning/` directory at the root of your repository. Every artifact is plain Markdown or JSON — readable by humans, writable by agents, and committable to git for team visibility. No database, no server, no external service. When you run `/clear` or start a new session, everything the next command needs is already in these files.
+
+## Root-level artifacts
+
+The root of `.planning/` holds the project-wide documents that every agent reads on every invocation.
+
+### `PROJECT.md`
+
+`PROJECT.md` is the single source of truth for what your project is and what it is not. It captures your project vision, architectural constraints, non-negotiable decisions, and evolution rules — the things that must remain true across every phase and milestone.
+
+Every agent reads `PROJECT.md` first, before any phase-specific context. When you approve the roadmap at the end of `/gsd-new-project`, the decisions you made during that conversation are locked into `PROJECT.md` as binding constraints.
+
+`PROJECT.md` also includes an optional `## Business Context` section — a four-field block (Customer, Revenue model, Success metric, Strategy notes) positioned between Core Value and Requirements. Use it for monetized or customer-facing projects where business outcomes should inform requirement prioritization; delete the section entirely for internal tools, experiments, or meta workspaces. Each field is one line — a constraint reference, not a business plan — and `Strategy notes` is meant to link out to a dedicated strategy doc rather than duplicate it inline. When the section is present, `/gsd-complete-milestone` reviews it as part of its milestone evolution pass and confirms the customer, revenue model, and success metric are still accurate after shipping; when it has been deleted, the check is skipped automatically.
+
+```markdown
+## Business Context
+
+<!-- OPTIONAL — only for monetized or customer-facing projects. Delete this section otherwise. -->
+
+- **Customer**: [Who pays / who uses — one line]
+- **Revenue model**: [How it makes money — one line]
+- **Success metric**: [The number that matters — one line]
+- **Strategy notes**: [Link to external strategy doc, if any]
+```
+
+### `REQUIREMENTS.md`
+
+`REQUIREMENTS.md` contains scoped, numbered requirements in three tiers:
+
+- **v1** — must ship in the current milestone
+- **v2** — planned for a future milestone
+- **Out of scope** — explicitly excluded
+
+Each requirement has a stable ID (for example, `REQ-001`, `REQ-002`). The roadmapper maps every v1 requirement to a phase when it builds `ROADMAP.md`, creating a traceability chain from requirement to phase to plan to implementation to verification.
+
+The plan-checker enforces that every plan covers the requirements it claims to address. The verifier enforces that every requirement mapped to the phase is implemented before the phase advances.
+
+### `ROADMAP.md`
+
+`ROADMAP.md` is your milestone and phase plan. It lists phases in order, records the status of each phase (planned, in progress, complete), and maps each phase to the `REQUIREMENTS.md` IDs it addresses.
+
+The roadmapper agent writes the initial `ROADMAP.md` during `/gsd-new-project`. You approve it before any phase work begins. Use `/gsd-phase` to add, remove, insert, or edit phases after the roadmap is approved.
+
+### `STATE.md`
+
+`STATE.md` is the living memory of your project. It is updated after every significant action and contains:
+
+- Current position (which phase, which step)
+- Active decisions and blockers
+- Metrics (phases completed, requirements covered)
+- The last known good state for session recovery
+
+When you run `/gsd-resume-work` after a break, GSD Core reads `STATE.md` to reconstruct context. When an agent needs to know where the project stands, it reads `STATE.md`. You never need to manually update `STATE.md` — GSD Core keeps it current.
+
+### `config.json`
+
+`config.json` is the workflow configuration file. It controls feature flags, model profiles, parallelization settings, and behavior of each workflow step. Edit it directly or use `/gsd-settings` for an interactive configuration interface.
+
+<Accordion title="Key config.json settings">
+  ```json
+  {
+    "model_profile": "balanced",
+    "workflow": {
+      "discuss_mode": "interview",
+      "nyquist_validation": true,
+      "ui_phase": true,
+      "context_coverage_gate": true
+    },
+    "parallelization": {
+      "enabled": true
+    }
+  }
+  ```
+
+  Common profiles:
+  - `"balanced"` — default; Opus for planning, Sonnet for research and execution
+  - `"quality"` — Opus for all heavy agents
+  - `"budget"` — Haiku and Sonnet throughout
+</Accordion>
+
+### `continue-here.md`
+
+`continue-here.md` is the cross-session handoff document. The `/gsd-pause-work` command writes a structured summary of the current session state — what was completed, what is in progress, and what comes next — so that you (or another session) can pick up exactly where you left off.
+
+When you run `/gsd-resume-work`, GSD Core reads `continue-here.md` alongside `STATE.md` to restore full context without re-reading the entire conversation history.
+
+## Per-phase artifacts
+
+Each phase gets its own directory under `.planning/phases/`. Directories are named with a two-digit phase number and a slug: `01-authentication`, `02-dashboard`, and so on.
+
+```text
+.planning/phases/
+└── 01-authentication/
+    ├── 01-CONTEXT.md
+    ├── 01-DISCUSSION-LOG.md
+    ├── 01-RESEARCH.md
+    ├── 01-01-PLAN.md
+    ├── 01-02-PLAN.md
+    ├── 01-01-SUMMARY.md
+    ├── 01-02-SUMMARY.md
+    ├── 01-VERIFICATION.md
+    └── 01-UAT.md
+```
+
+### `CONTEXT.md`
+
+`CONTEXT.md` captures your implementation preferences for the phase, written by `/gsd-discuss-phase`. It contains a structured `<decisions>` block of numbered decisions — library choices, design patterns, testing approach, and anything else you specified during the discussion.
+
+The planner reads `CONTEXT.md` to understand your preferences before writing plans. The plan-checker runs a decision coverage gate after planning to confirm every trackable decision appears in at least one plan. The verifier runs a second check after execution to confirm decisions were honored in the shipped code.
+
+### `DISCUSSION-LOG.md`
+
+`DISCUSSION-LOG.md` is the full audit trail of the discuss-phase conversation. It records every question asked and every answer given, so you can review the reasoning behind any decision in `CONTEXT.md` without re-running the discussion.
+
+### `RESEARCH.md`
+
+`RESEARCH.md` contains the synthesized output of the parallel phase researchers. It covers stack research, feature patterns, architectural approaches, and common pitfalls for the specific domain of this phase.
+
+The planner reads `RESEARCH.md` alongside `CONTEXT.md` and `REQUIREMENTS.md` to write plans that are grounded in current ecosystem knowledge. Critically, `RESEARCH.md` includes a **Package Legitimacy Audit** table that records the slopcheck verdict for every external package the researchers recommended — `[OK]`, `[SUS]`, or `[SLOP]`. Packages rated `[SLOP]` are removed before the planner ever sees them.
+
+### `PLAN.md` files
+
+Each `XX-YY-PLAN.md` file is one atomic execution plan. Plans are numbered sequentially (`01-01`, `01-02`, etc.) and sized to fit in a single fresh executor context window. Each plan contains:
+
+- A structured list of `<task>` elements with explicit acceptance criteria
+- A `read_first` section listing the files the executor must read before starting
+- A `must_haves` section linking tasks to requirement IDs
+- A dependency declaration for wave ordering
+
+The plan-checker verifies each plan meets eight quality dimensions before approval. Plans that fail are revised automatically.
+
+### `SUMMARY.md` files
+
+Each `XX-YY-SUMMARY.md` file is written by the executor after completing its assigned plan. It documents:
+
+- What was implemented (with file paths and git commit hashes)
+- Any deviations from the plan and why
+- Issues encountered and how they were resolved
+
+The verifier reads all `SUMMARY.md` files to understand what the executors claim to have built, then cross-checks those claims against the actual codebase.
+
+### `VERIFICATION.md`
+
+`VERIFICATION.md` is written by the verifier agent after all executors complete. It contains a PASS or FAIL verdict with specific evidence — which requirements were satisfied, which tests passed, and which gaps were found. If the verdict is FAIL, the verification report becomes the input for the fix cycle.
+
+### `UAT.md`
+
+`UAT.md` is written during `/gsd-verify-work`. It records your manual acceptance testing — the scenarios you tested, the results, and any issues you found. It complements the automated `VERIFICATION.md` with human judgment about whether the phase meets real-world requirements.
+
+## Additional planning directories
+
+Beyond phase artifacts, `.planning/` contains several supporting directories:
+
+| Directory | Purpose |
+|-----------|---------|
+| `research/` | Domain research from `/gsd-new-project` (SUMMARY.md, STACK.md, FEATURES.md, ARCHITECTURE.md, PITFALLS.md) |
+| `codebase/` | Brownfield codebase mapping from `/gsd-map-codebase` |
+| `debug/` | Active debug sessions from `/gsd-debug` |
+| `spikes/` | Feasibility experiments from `/gsd-spike` |
+| `sketches/` | HTML mockups from `/gsd-sketch` |
+| `threads/` | Persistent cross-session knowledge stores from `/gsd-thread` |
+| `seeds/` | Forward-looking ideas from `/gsd-capture --seed` |
+| `todos/` | Captured ideas in `pending/` and `done/` subdirectories |

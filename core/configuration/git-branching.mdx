@@ -1,0 +1,165 @@
+---
+title: "Configure Git Branching Strategy for GSD Core Projects"
+sidebarTitle: "Git Branching"
+description: "Set up GSD Core's git branching strategy — none, phase, or milestone — with custom branch name templates and base branch configuration in config.json."
+---
+
+GSD Core can manage git branching automatically as part of the execute-and-ship workflow. By default it works entirely on your current branch, but you can configure it to create a dedicated branch for each phase or each milestone, giving you clean separation for code review and rollback. All branching settings live in the `git` section of `.planning/config.json`.
+
+## Configuration reference
+
+```json
+{
+  "git": {
+    "branching_strategy": "none",
+    "base_branch": "main",
+    "phase_branch_template": "gsd/phase-{phase}-{slug}",
+    "milestone_branch_template": "gsd/{milestone}-{slug}"
+  }
+}
+```
+
+Configure these settings interactively with `/gsd-config --advanced` (Git Customization section) or by editing `config.json` directly.
+
+## Branching strategies
+
+<Tabs>
+  <Tab title="none (default)">
+    All work happens on your current branch. GSD makes no branch decisions — it commits directly to whatever branch you are on when you invoke `/gsd-execute-phase`. This is the right choice for solo development, simple projects, or when you manage branching yourself.
+
+    ```json
+    { "git": { "branching_strategy": "none" } }
+    ```
+  </Tab>
+  <Tab title="phase">
+    GSD creates a new branch at the start of each `/gsd-execute-phase` run. The branch is named using `phase_branch_template`. After the phase is verified and shipped, you merge or delete the branch.
+
+    ```json
+    {
+      "git": {
+        "branching_strategy": "phase",
+        "base_branch": "main",
+        "phase_branch_template": "gsd/phase-{phase}-{slug}"
+      }
+    }
+    ```
+
+    A phase 3 execution with the slug `user-authentication` would create the branch `gsd/phase-03-user-authentication`.
+  </Tab>
+  <Tab title="milestone">
+    GSD creates one branch for the entire milestone at the start of the first `/gsd-execute-phase` run for that milestone. All phases in the milestone commit to the same branch. The branch is named using `milestone_branch_template` and merged or deleted at `/gsd-complete-milestone`.
+
+    ```json
+    {
+      "git": {
+        "branching_strategy": "milestone",
+        "base_branch": "main",
+        "milestone_branch_template": "gsd/{milestone}-{slug}"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Strategy comparison
+
+| Strategy | Branch created | Scope | Merge point | Best for |
+|----------|---------------|-------|-------------|----------|
+| `none` | Never | Current branch | N/A | Solo development, simple projects |
+| `phase` | At `execute-phase` start | One phase | User merges after each phase | Code review per phase, granular rollback |
+| `milestone` | At first `execute-phase` in the milestone | All phases in the milestone | At `complete-milestone` | Release branches, PR per version |
+
+## Template variables
+
+Customize the branch name format by editing the template strings in `config.json`.
+
+| Variable | Available in | Example output |
+|----------|-------------|----------------|
+| `{phase}` | `phase_branch_template` | `03` (zero-padded) |
+| `{slug}` | Both templates | `user-authentication` (lowercase, hyphenated from phase name) |
+| `{milestone}` | `milestone_branch_template` | `v1.0` |
+
+<Accordion title="Custom template examples">
+  Use any combination of variables and literal text:
+
+  ```json
+  {
+    "git": {
+      "branching_strategy": "phase",
+      "phase_branch_template": "feature/gsd-{phase}-{slug}"
+    }
+  }
+  ```
+
+  With the above template, phase 2 named "API layer" produces: `feature/gsd-02-api-layer`
+
+  For milestone strategy with a custom format:
+
+  ```json
+  {
+    "git": {
+      "branching_strategy": "milestone",
+      "milestone_branch_template": "release/{milestone}"
+    }
+  }
+  ```
+
+  This produces: `release/v1.0`
+</Accordion>
+
+## Base branch
+
+Set `git.base_branch` to the integration branch that phase and milestone branches are created from and eventually merged back into. Override this when your repository uses `master`, `develop`, or a named release branch rather than `main`.
+
+```json
+{
+  "git": {
+    "base_branch": "develop"
+  }
+}
+```
+
+<Note>
+  GSD also reads `git.base_branch` to determine where to target the pull request created by `/gsd-ship`. Make sure this matches the default branch in your GitHub repository settings.
+</Note>
+
+## Milestone completion merge options
+
+When using the `milestone` strategy, `/gsd-complete-milestone` offers you a choice of how to merge the milestone branch back into `base_branch`:
+
+| Option | Git command | Result |
+|--------|-------------|--------|
+| Squash merge (recommended) | `git merge --squash` | Single clean commit representing the entire milestone |
+| Merge with history | `git merge --no-ff` | Preserves all individual phase commits |
+| Delete without merging | `git branch -D` | Discards the branch; useful if you shipped via individual phase PRs |
+| Keep branches | (none) | Leaves branches in place for manual handling |
+
+## Tags on milestone completion
+
+By default, GSD creates a git tag (`v[X.Y]`) when a milestone completes. Disable this if you have your own release tagging workflow:
+
+```json
+{
+  "git": {
+    "create_tag": false
+  }
+}
+```
+
+## /gsd-quick branch template
+
+Optionally configure an automatic branching strategy for `/gsd-quick` ad-hoc tasks:
+
+```json
+{
+  "git": {
+    "quick_branch_template": "gsd/quick-{num}-{slug}"
+  }
+}
+```
+
+When set, `/gsd-quick` creates a branch named with the task ID and a slug derived from the task description before running. When `null` (the default), `/gsd-quick` works on your current branch.
+
+<Tip>
+  Use the `phase` strategy with a short review cycle to get clean, reviewable PRs for each unit of work. Use the `milestone` strategy when your team reviews releases as a whole rather than individual phases.
+</Tip>

@@ -1,0 +1,243 @@
+---
+title: "GSD Browser Capture Commands: screenshot, PDF, HAR, records"
+sidebarTitle: "Capture"
+description: "Complete reference for GSD Browser capture and extraction commands: screenshot, PDF, page source, eval, HAR export, recordings, and debug bundles."
+---
+
+Capture and extraction commands let you read data out of the browser — as images, documents, raw HTML, JavaScript return values, or structured network archives. Use these commands to build evidence bundles, verify page state, extract data for downstream processing, or record flows for replay and audit.
+
+---
+
+## `gsd-browser screenshot`
+
+Capture a screenshot of the current page and return it as a base64-encoded image. When you pass `--output`, the raw image bytes are written directly to a file on disk instead.
+
+```bash
+gsd-browser screenshot [flags]
+```
+
+<ParamField query="--output" type="string">
+  File path where the image should be saved (e.g. `./screenshots/page.png`). When set, the command writes raw bytes to disk and prints a confirmation line instead of returning base64 data.
+</ParamField>
+
+<ParamField query="--selector" type="string">
+  CSS selector of a single element to capture. The screenshot crops to that element's bounding box and always produces a PNG, ignoring the `--format` flag.
+</ParamField>
+
+<ParamField query="--full-page" type="flag">
+  Capture the entire scrollable page height, not just the current viewport.
+</ParamField>
+
+<ParamField query="--quality" type="number">
+  JPEG compression quality from `1` (lowest) to `100` (highest). Defaults to `80`. Has no effect when the format is `png`.
+</ParamField>
+
+<ParamField query="--format" type="string">
+  Image format: `jpeg` (default) or `png`. Element screenshots (`--selector`) are always PNG regardless of this setting.
+</ParamField>
+
+**Examples**
+
+```bash
+# Capture the viewport as JPEG (default quality 80)
+gsd-browser screenshot
+
+# Save a full-page PNG to disk
+gsd-browser screenshot --full-page --format png --output ./captures/full-page.png
+
+# Crop to a specific element
+gsd-browser screenshot --selector "#hero-banner" --output ./captures/hero.png
+
+# High-quality JPEG for sharing
+gsd-browser screenshot --quality 95 --output report.jpg
+
+# Get base64 JSON output for programmatic use
+gsd-browser screenshot --json
+```
+
+---
+
+## `gsd-browser save-pdf`
+
+Export the current page as a PDF file. The PDF is rendered using the browser's built-in print engine, which honours CSS print stylesheets.
+
+```bash
+gsd-browser save-pdf [flags]
+```
+
+<ParamField query="--output" type="string">
+  Full file path for the saved PDF (e.g. `./exports/report.pdf`). When omitted, the file is saved to the session directory and the path is printed.
+</ParamField>
+
+<ParamField query="--filename" type="string">
+  Output filename (used when you want the file saved to the default session directory with a specific name).
+</ParamField>
+
+<ParamField query="--format" type="string">
+  Page size: `A4` (default), `Letter`, `Legal`, or `Tabloid`.
+</ParamField>
+
+<ParamField query="--print-background" type="flag">
+  Include background graphics and colours in the PDF output. Enabled by default; pass `--print-background false` to disable.
+</ParamField>
+
+**Examples**
+
+```bash
+# Export to A4 PDF (default)
+gsd-browser save-pdf --output ./report.pdf
+
+# US Letter size
+gsd-browser save-pdf --format Letter --output ./wide-report.pdf
+
+# Save to a named file in the session directory
+gsd-browser save-pdf --filename invoice.pdf
+```
+
+---
+
+## `gsd-browser page-source`
+
+Return the HTML source of the current page or a scoped element.
+
+```bash
+gsd-browser page-source [flags]
+```
+
+<ParamField query="--selector" type="string">
+  CSS selector to scope the source output to a specific element. Omit to retrieve the full page source.
+</ParamField>
+
+**Examples**
+
+```bash
+# Get the full page HTML
+gsd-browser page-source
+
+# Get the outer HTML of the navigation component
+gsd-browser page-source --selector "nav"
+
+# Get HTML of a specific section
+gsd-browser page-source --selector "#results-list"
+```
+
+---
+
+## `gsd-browser eval`
+
+Evaluate a JavaScript expression in the context of the current page and return its result. Use `--json` to parse the return value as structured JSON rather than a plain string.
+
+```bash
+gsd-browser eval <expression> [flags]
+```
+
+<ParamField path="expression" type="string" required>
+  Any valid JavaScript expression. The expression runs in the page's global scope and has access to `window`, `document`, and all page globals.
+</ParamField>
+
+**Examples**
+
+```bash
+# Read the current scroll position
+gsd-browser eval "window.scrollY"
+
+# Check local storage for a session token
+gsd-browser eval "localStorage.getItem('auth_token')"
+
+# Return a structured object parsed as JSON
+gsd-browser eval "JSON.stringify({title: document.title, url: location.href})" --json
+
+# Count elements matching a selector
+gsd-browser eval "document.querySelectorAll('.result-item').length"
+```
+
+---
+
+## `gsd-browser har-export`
+
+Export all captured network traffic for the current session as a HAR 1.2 JSON file. The network buffer accumulates requests continuously; call this command at any point to flush the buffer to disk.
+
+```bash
+gsd-browser har-export [flags]
+```
+
+<ParamField query="--filename" type="string">
+  Output file path for the HAR file (e.g. `./session.har`). When omitted, the file is saved to the session directory and the path is printed.
+</ParamField>
+
+**Examples**
+
+```bash
+# Export all recorded network traffic
+gsd-browser har-export
+
+# Export to a specific path
+gsd-browser har-export --filename ./evidence/network-capture.har
+```
+
+<Note>
+  The network buffer accumulates across the entire session. Call `gsd-browser network --clear` if you want to start a fresh capture window before running a specific flow.
+</Note>
+
+---
+
+## `gsd-browser record-start` / `gsd-browser record-stop`
+
+Record a named flow session that captures actions, screenshots, and network activity into an evidence bundle. Start the recording before performing actions; stop it when the flow is complete.
+
+```bash
+gsd-browser record-start --name <name>
+gsd-browser record-stop
+```
+
+<ParamField query="--name" type="string" required>
+  A human-readable name for this recording (e.g. `checkout-flow-2026-06`). The name is used as part of the bundle filename and is shown in the recordings list.
+</ParamField>
+
+**Additional recording commands**
+
+| Command | Description |
+|---|---|
+| `gsd-browser record-pause` | Pause an active recording without stopping it |
+| `gsd-browser record-resume` | Resume a paused recording |
+| `gsd-browser recordings` | List all saved recordings |
+| `gsd-browser recording-get <id>` | Get the manifest for a specific recording |
+| `gsd-browser recording-export <id> --output <dir>` | Export a recording bundle to a directory |
+| `gsd-browser recording-discard <id>` | Delete a recording |
+
+**Examples**
+
+```bash
+# Start recording a checkout flow
+gsd-browser record-start --name "checkout-flow-2026-06"
+gsd-browser navigate https://example.com/cart
+# ... perform checkout steps ...
+gsd-browser record-stop
+
+# List all recordings
+gsd-browser recordings
+
+# Export a recording to an evidence directory
+gsd-browser recording-export rec_abc123 --output ./evidence/checkout/
+```
+
+---
+
+## `gsd-browser debug-bundle`
+
+Capture a complete debug bundle — screenshot, console log, network log, timeline, and accessibility tree — in a single command. Use this to collect all diagnostic evidence at a point in time.
+
+```bash
+gsd-browser debug-bundle [flags]
+```
+
+<ParamField query="--name" type="string">
+  Optional suffix to append to the bundle directory name, making it easier to identify in the file system.
+</ParamField>
+
+**Example**
+
+```bash
+# Capture a debug bundle after a suspected failure
+gsd-browser debug-bundle --name "payment-error"
+```

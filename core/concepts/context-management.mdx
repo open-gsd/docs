@@ -1,0 +1,142 @@
+---
+title: "Context Management and Session Persistence in GSD Core"
+sidebarTitle: "Context Management"
+description: "Learn how GSD Core prevents context rot, monitors context usage in real time, guards against prompt injection, and maintains project state across sessions."
+---
+
+Context management is the foundational engineering problem that GSD Core was built to solve. Most AI coding setups fail at scale not because the model is incapable, but because the context window fills up, quality degrades silently, and there is no mechanism to resume where you left off. GSD Core addresses this at three levels: architectural design, runtime monitoring, and cross-session persistence.
+
+## What context rot is
+
+Context rot is the quality degradation that accumulates as an AI fills its context window with conversation history. The model's attention is finite — as the window fills, the signal-to-noise ratio drops, earlier content receives less attention, and the quality of reasoning and recall quietly degrades. The model does not warn you when this happens. It continues generating output, but that output is less accurate, less consistent, and more likely to contradict earlier decisions.
+
+Context rot is why an AI that produces excellent results on a fresh task produces mediocre results on the tenth task in the same session. The model has not changed — its context has degraded.
+
+## Fresh-context subagent architecture
+
+GSD Core's primary defense against context rot is architectural: heavy work never runs in the main session. Instead, thin orchestrators spawn specialist subagents, each in its own isolated context window.
+
+When you run `/gsd-plan-phase 1`, the orchestrator does not do the planning in your current conversation. It spawns:
+
+1. Four researcher subagents — each with a fresh context window, each focused on one research dimension
+2. A synthesizer subagent — reads only the four research outputs, nothing else
+3. A planner subagent — reads only `PROJECT.md`, `REQUIREMENTS.md`, `CONTEXT.md`, and `RESEARCH.md`
+4. A plan-checker subagent — reads only the generated plans and the phase context
+
+None of these agents carries the weight of your conversation history. Each starts clean with up to 200K tokens of headroom — or up to 1M tokens on models like Claude Opus 4.6 and Sonnet 4.6 that support larger windows. The result (a set of approved `PLAN.md` files) arrives in your session without the accumulated cost of the work that produced it.
+
+This pattern holds throughout the phase loop:
+
+- **Execute:** Each executor subagent gets one plan and a fresh context — parallel executors run simultaneously without sharing state
+- **Verify:** The verifier reads all summaries and performs a goal-backward check in its own clean window
+- **Map codebase:** Four mapper subagents explore different dimensions of your codebase in parallel
+
+Your main session stays lean. After each major command, run `/clear` to reset the conversation context. GSD Core is designed for this — the state that matters is in `.planning/`, not in conversation memory.
+
+## The context monitor hook
+
+Even with fresh-context subagents, some workflows run in the main session for extended periods. The context monitor hook watches your context usage in real time and injects warnings directly into the agent's conversation when usage runs high.
+
+The hook works as a pipeline between two components:
+
+```text
+Status line hook (gsd-statusline.js)
+    │  writes context metrics
+    ▼
+/tmp/claude-ctx-{session_id}.json
+    │  reads metrics after each tool use
+    ▼
+Context monitor hook (gsd-context-monitor.js)
+    │  injects additionalContext warning
+    ▼
+Agent sees warning in next turn
+```
+
+The status line hook runs on every turn and writes current context metrics (tokens used, remaining percentage, timestamp) to a temporary bridge file. After each tool use, the context monitor reads the bridge file and injects a warning if usage crosses a threshold.
+
+### Warning thresholds
+
+| Remaining context | Level | Message injected |
+|------------------|-------|-----------------|
+| > 35% | Normal | No warning |
+| ≤ 35% | **WARNING** | Wrap up the current task; avoid starting new complex work |
+| ≤ 25% | **CRITICAL** | Context nearly exhausted; save state with `/gsd-pause-work` and start a new session |
+
+<Note>
+  The context monitor is advisory only. It injects a warning that the agent sees, but it never blocks tool execution or overrides your commands. A broken monitor exits silently — it cannot interfere with your workflow.
+</Note>
+
+### Debounce behavior
+
+To avoid flooding the agent with repeated warnings, the monitor debounces after the first alert:
+
+- The first warning fires immediately when a threshold is crossed
+- Subsequent warnings at the same severity level require five tool uses between them
+- Severity escalation from WARNING to CRITICAL bypasses the debounce and fires immediately
+
+### Status line
+
+The status line hook also renders a persistent status bar in your terminal showing the current model, active task, working directory, and a context usage bar. This gives you a human-readable view of the same context metrics the agent sees internally.
+
+## Prompt guard and read injection scanner
+
+GSD Core generates Markdown files that become LLM system prompts. Any user-controlled text that flows into planning artifacts is a potential indirect prompt injection vector — an attacker could embed instructions in a file you ask GSD Core to read, and those instructions could execute in the agent's context.
+
+GSD Core includes two defensive hooks:
+
+### Prompt guard (`gsd-prompt-guard.js`)
+
+The prompt guard fires on every Write or Edit call to `.planning/` files. It scans the content being written for known injection patterns:
+
+- Role override attempts (`"Ignore previous instructions"`, `"You are now..."`)
+- Instruction bypass patterns
+- System tag injections
+
+If a pattern is detected, the guard logs a warning. The guard is **advisory only** — it does not block the write. The warning surfaces for human review without interrupting the workflow.
+
+### Read injection scanner (`gsd-read-injection-scanner.js`)
+
+The read injection scanner fires after every Read tool call. It scans the tool output for embedded instructions in untrusted content — for example, a source file or external document that contains hidden directives designed to manipulate the agent.
+
+Like the prompt guard, the scanner is advisory and never blocks the read. Together, the two hooks provide defense-in-depth against the most common prompt injection vectors.
+
+## Cross-session persistence
+
+GSD Core maintains project state across sessions without relying on conversation memory. Two files are the backbone of session persistence:
+
+### `STATE.md`
+
+`STATE.md` is the living memory of your project. It is updated after every significant action and contains the current position in the phase loop, active decisions and blockers, and metrics. When you start a new session, running `/gsd-progress` reads `STATE.md` and tells you exactly where you left off and what to do next.
+
+`STATE.md` is designed to be small and high-signal. It does not hold the full history of every decision — it holds the current state and the most recent decisions that are still active. Historical decisions are archived in phase artifacts.
+
+### `continue-here.md`
+
+`continue-here.md` is a structured handoff document written by `/gsd-pause-work`. It captures the current session's momentum:
+
+- What was completed in this session
+- What is currently in progress
+- What the next concrete step is
+- Any open questions or blockers
+
+When you run `/gsd-resume-work` at the start of a new session, GSD Core reads `continue-here.md` alongside `STATE.md` to restore full context without re-reading the entire conversation history. The agent comes back oriented and ready to continue — not asking you to re-explain the project.
+
+## Practical context discipline
+
+Follow these practices to keep context healthy throughout a project:
+
+<Accordion title="Run /clear between major commands">
+  GSD Core is designed for frequent context clears. After `/gsd-new-project`, after `/gsd-plan-phase`, and after `/gsd-execute-phase`, run `/clear` before the next command. All state is in `.planning/` — nothing important is lost.
+</Accordion>
+
+<Accordion title="Use /gsd-progress when you return">
+  After any break, run `/gsd-progress` before doing anything else. It reads `STATE.md` and tells you exactly where you are and what step is next. This is faster and more accurate than re-reading the conversation history.
+</Accordion>
+
+<Accordion title="Respond to WARNING messages">
+  When the context monitor injects a WARNING, finish your current task and then run `/gsd-pause-work` to save state, `/clear` to reset context, and `/gsd-resume-work` to pick up exactly where you stopped.
+</Accordion>
+
+<Accordion title="Respond to CRITICAL messages immediately">
+  When the context monitor injects a CRITICAL warning, stop immediately. Run `/gsd-pause-work` to write the handoff, then `/clear`. Do not start new work in a critical context — the output quality will be degraded.
+</Accordion>

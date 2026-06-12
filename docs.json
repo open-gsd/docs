@@ -1,0 +1,156 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Open GSD",
+  "theme": "luma",
+  "colors": {
+    "primary": "#949497",
+    "light": "#323740",
+    "dark": "#d5d5d4"
+  },
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "https://media.brand.dev/55b6b02b-70aa-4b85-b00a-938bc425bdfa.png",
+    "dark": "https://media.brand.dev/55b6b02b-70aa-4b85-b00a-938bc425bdfa.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/open-gsd"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "GSD Core",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "core/introduction",
+              "core/installation",
+              "core/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/concepts/workflow",
+              "core/concepts/planning-artifacts",
+              "core/concepts/agents",
+              "core/concepts/context-management"
+            ]
+          },
+          {
+            "group": "Workflow Guide",
+            "pages": [
+              "core/guides/new-project",
+              "core/guides/phase-lifecycle",
+              "core/guides/code-review",
+              "core/guides/autonomous-mode",
+              "core/guides/cross-ai-review"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "core/configuration/settings",
+              "core/configuration/model-profiles",
+              "core/configuration/git-branching",
+              "core/configuration/integrations"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "core/commands/workflow-commands",
+              "core/commands/project-commands",
+              "core/commands/quality-commands",
+              "core/commands/context-commands",
+              "core/commands/manage-commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "GSD Pi",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "pi/introduction",
+              "pi/installation",
+              "pi/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "pi/concepts/project-structure",
+              "pi/concepts/auto-mode",
+              "pi/concepts/extensions",
+              "pi/concepts/model-routing"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "pi/guides/new-project",
+              "pi/guides/worktrees",
+              "pi/guides/headless-ci",
+              "pi/guides/web-ui",
+              "pi/guides/mcp-server"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "pi/configuration/preferences",
+              "pi/configuration/providers",
+              "pi/configuration/git-automation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "GSD Browser",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "browser/introduction",
+              "browser/installation",
+              "browser/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "browser/concepts/sessions",
+              "browser/concepts/snapshots-refs",
+              "browser/concepts/mcp-server"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "browser/guides/ai-agent-setup",
+              "browser/guides/live-viewer",
+              "browser/guides/recording-evidence",
+              "browser/guides/network-control",
+              "browser/guides/authentication-vault"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "browser/commands/navigation",
+              "browser/commands/interaction",
+              "browser/commands/capture",
+              "browser/commands/session-management"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

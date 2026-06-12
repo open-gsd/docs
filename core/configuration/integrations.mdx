@@ -1,0 +1,155 @@
+---
+title: "GSD Core External Service Integrations Configuration"
+sidebarTitle: "Integrations"
+description: "Configure web research APIs, cross-AI review CLI routing, custom agent skills, code quality tooling, and parallelization settings in .planning/config.json."
+---
+
+GSD Core integrates with external services and tools through `.planning/config.json`. Most integration settings are connectivity concerns — API keys, CLI routing, and path configuration — and are intentionally kept separate from workflow toggles. Configure them interactively with `/gsd-config --integrations` or by editing `config.json` directly.
+
+## Web research
+
+GSD Core uses web search during the research phase of `/gsd-plan-phase`. Three providers are supported. GSD auto-detects which are available by checking for API keys in environment variables or key files, but you can override detection explicitly.
+
+```json
+{
+  "brave_search": "your-brave-api-key",
+  "firecrawl": "your-firecrawl-api-key",
+  "exa_search": "your-exa-api-key"
+}
+```
+
+| Setting | Environment variable | Key file | Description |
+|---------|---------------------|----------|-------------|
+| `brave_search` | `BRAVE_API_KEY` | `~/.gsd/brave_api_key` | Brave Search API key for web research. Used as the primary search provider during plan-phase research. |
+| `firecrawl` | `FIRECRAWL_API_KEY` | `~/.gsd/firecrawl_api_key` | Firecrawl API key for deep-crawl scraping of documentation sites and reference pages. |
+| `exa_search` | `EXA_API_KEY` | `~/.gsd/exa_api_key` | Exa Search API key for semantic similarity search across technical content. |
+
+<Note>
+  API keys are masked in all GSD output — keys with 8+ characters display as `****<last-4>`. The plaintext value is written to `config.json`, which is the security boundary. Never commit `config.json` to a public repository with real API keys in it.
+</Note>
+
+Set keys via `/gsd-config --integrations` to benefit from masking in confirmation output, or write them directly to `config.json` and restrict file permissions appropriately.
+
+## Cross-AI review CLI routing
+
+Configure which shell command GSD invokes for each AI reviewer when running `/gsd-review`. Keys under `review.models.<cli>` map a reviewer flavor to an executable command. When a key is absent, GSD uses each CLI's configured default.
+
+```json
+{
+  "review": {
+    "models": {
+      "claude": "claude",
+      "codex": "codex exec --model gpt-5.3-codex",
+      "gemini": "gemini -m gemini-2.5-pro",
+      "opencode": "opencode run --model anthropic/claude-sonnet-4-6",
+      "qwen": "qwen-code",
+      "cursor": "cursor-agent",
+      "ollama": "codellama",
+      "lm_studio": "mistral-7b-instruct",
+      "llama_cpp": "llama3"
+    },
+    "default_reviewers": ["gemini", "codex"]
+  }
+}
+```
+
+<Accordion title="Reviewer slug reference">
+  | Slug | Reviewer | Notes |
+  |------|----------|-------|
+  | `claude` | Claude (separate session) | Defaults to the current session model when unset |
+  | `codex` | Codex CLI | e.g. `"codex exec --model gpt-5.3-codex"` |
+  | `gemini` | Gemini CLI | e.g. `"gemini -m gemini-2.5-pro"` |
+  | `opencode` | OpenCode | e.g. `"opencode run --model claude-sonnet-4-6"` |
+  | `qwen` | Qwen Code | |
+  | `cursor` | Cursor agent | |
+  | `coderabbit` | CodeRabbit | |
+  | `agy` | Antigravity CLI | |
+  | `ollama` | Ollama server | Value is the model name, e.g. `"codellama"` |
+  | `lm_studio` | LM Studio | Value is the model name |
+  | `llama_cpp` | llama.cpp | Value is the model name |
+</Accordion>
+
+Use `review.default_reviewers` to set the reviewers that `/gsd-review` runs when invoked without explicit reviewer flags. Set it to `null` (the default) to run all detected reviewers automatically.
+
+## Custom agent skills injection
+
+Inject custom skill files into GSD subagent prompts to give specific agent types project-specific instructions that go beyond what `CLAUDE.md` provides. Skills are read at spawn time and injected as an `<agent_skills>` block in the agent's prompt.
+
+```json
+{
+  "agent_skills": {
+    "gsd-executor": ["skills/testing-standards", "skills/api-conventions"],
+    "gsd-planner": ["skills/architecture-rules"],
+    "gsd-verifier": ["skills/acceptance-criteria"]
+  }
+}
+```
+
+Each value is an array of directory paths relative to your project root. Each path must contain a `SKILL.md` file. GSD validates paths for safety and rejects any path that would escape the project root.
+
+<Accordion title="Supported agent types">
+  | Agent type | Role |
+  |------------|------|
+  | `gsd-executor` | Executes implementation plans |
+  | `gsd-planner` | Creates phase plans |
+  | `gsd-checker` | Verifies plan quality |
+  | `gsd-verifier` | Post-execution verification |
+  | `gsd-researcher` | Phase research |
+  | `gsd-project-researcher` | New-project research |
+  | `gsd-debugger` | Diagnostic agents |
+  | `gsd-codebase-mapper` | Codebase analysis |
+  | `gsd-advisor` | Discuss-phase advisors |
+  | `gsd-roadmapper` | Roadmap creation |
+</Accordion>
+
+Configure agent skills interactively via `/gsd-config --integrations`, which validates the paths before writing to config.
+
+## Code quality tooling
+
+GSD Core integrates with optional structural analysis tooling that augments `/gsd-code-review`. The `code_quality` namespace is additive — each tool is independently opt-in and off by default.
+
+```json
+{
+  "code_quality": {
+    "fallow": {
+      "enabled": true,
+      "scope": "phase",
+      "profile": "standard"
+    }
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `code_quality.fallow.enabled` | `false` | Enable the fallow structural pre-pass for `/gsd-code-review`. When enabled, GSD runs fallow before the agent review and embeds a **Structural Findings** section in `REVIEW.md`. |
+| `code_quality.fallow.scope` | `"phase"` | Analysis scope: `"phase"` covers files changed in the current review; `"repo"` covers the entire repository. |
+| `code_quality.fallow.profile` | `"standard"` | Fallow profile passed to the pre-pass runner: `"minimal"`, `"standard"`, or `"strict"`. |
+
+## Parallelization
+
+GSD Core runs independent plans simultaneously using git worktrees. Configure how many agents can run in parallel and when parallel execution kicks in.
+
+```json
+{
+  "parallelization": {
+    "enabled": true,
+    "max_concurrent_agents": 3,
+    "min_plans_for_parallel": 2
+  }
+}
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `parallelization.enabled` | `true` | Master switch for parallel execution. Set `false` to run plans sequentially. |
+| `parallelization.max_concurrent_agents` | `3` | Maximum number of agent processes running simultaneously. Lower this value if your environment has limited resources or API rate constraints. |
+| `parallelization.min_plans_for_parallel` | `2` | Minimum number of plans required before parallel execution is used. Phases with fewer plans always run sequentially. |
+
+<Warning>
+  When parallelization is enabled, executor agents commit with `--no-verify` to avoid build lock contention (for example, Cargo lock conflicts in Rust projects). The orchestrator validates hooks once after each wave completes. Set `parallelization.enabled: false` if you need pre-commit hooks to run on every individual commit.
+</Warning>
+
+<Tip>
+  Run `/gsd-manager --analyze-deps` before starting a multi-phase autonomous run. It scans your ROADMAP for dependency relationships and presents a parallelization plan showing which phases can safely run in parallel versus which must wait on a predecessor.
+</Tip>

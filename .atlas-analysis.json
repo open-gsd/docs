@@ -1,0 +1,199 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Open GSD",
+  "projectDescription": "Open GSD is a suite of AI-powered developer tools — including a spec-driven coding workflow engine (GSD Core), an autonomous local coding agent (GSD Pi), and a native browser automation layer (GSD Browser) — that help teams plan, implement, verify, and ship software with AI agents.",
+  "theme": "luma",
+  "primaryColor": "#949497",
+  "lightColor": "#323740",
+  "darkColor": "#d5d5d4",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "GSD Core",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "core/introduction",
+              "core/installation",
+              "core/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core/concepts/workflow",
+              "core/concepts/planning-artifacts",
+              "core/concepts/agents",
+              "core/concepts/context-management"
+            ]
+          },
+          {
+            "group": "Workflow Guide",
+            "pages": [
+              "core/guides/new-project",
+              "core/guides/phase-lifecycle",
+              "core/guides/code-review",
+              "core/guides/autonomous-mode",
+              "core/guides/cross-ai-review"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "core/configuration/settings",
+              "core/configuration/model-profiles",
+              "core/configuration/git-branching",
+              "core/configuration/integrations"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "core/commands/workflow-commands",
+              "core/commands/project-commands",
+              "core/commands/quality-commands",
+              "core/commands/context-commands",
+              "core/commands/manage-commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "GSD Pi",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "pi/introduction",
+              "pi/installation",
+              "pi/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "pi/concepts/project-structure",
+              "pi/concepts/auto-mode",
+              "pi/concepts/extensions",
+              "pi/concepts/model-routing"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "pi/guides/new-project",
+              "pi/guides/worktrees",
+              "pi/guides/headless-ci",
+              "pi/guides/web-ui",
+              "pi/guides/mcp-server"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "pi/configuration/preferences",
+              "pi/configuration/providers",
+              "pi/configuration/git-automation"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "GSD Browser",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "browser/introduction",
+              "browser/installation",
+              "browser/quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "browser/concepts/sessions",
+              "browser/concepts/snapshots-refs",
+              "browser/concepts/mcp-server"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "browser/guides/ai-agent-setup",
+              "browser/guides/live-viewer",
+              "browser/guides/recording-evidence",
+              "browser/guides/network-control",
+              "browser/guides/authentication-vault"
+            ]
+          },
+          {
+            "group": "Command Reference",
+            "pages": [
+              "browser/commands/navigation",
+              "browser/commands/interaction",
+              "browser/commands/capture",
+              "browser/commands/session-management"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Spec-driven development pipeline: Requirements → Research → Plan → Execute → Verify → Ship",
+    "Fresh-context subagent architecture prevents context rot across long coding sessions",
+    "Wave-based parallel execution of independent plans within a phase",
+    "65+ slash commands across workflow, quality, context, project, and management namespaces",
+    "15 supported AI runtimes (Claude Code, Gemini CLI, Cursor, Windsurf, Codex, and more)",
+    "Cross-AI code review from multiple LLM providers (Gemini, Codex, OpenCode, Qwen, Ollama, etc.)",
+    "Autonomous mode: fully automated plan → implement → verify → advance loop",
+    "Local project memory in .planning/ (GSD Core) and .gsd/ (GSD Pi) with human-readable Markdown projections",
+    "Multi-provider model routing with per-phase model profiles (quality / balanced / budget)",
+    "Git worktree isolation for parallel and safe development",
+    "Extension system with bundled and community extensions",
+    "Native browser automation via CDP with versioned element refs and MCP server mode",
+    "Live authenticated viewer for human-in-the-loop browser automation sessions",
+    "Headless/CI mode for pipeable, JSON-output automation",
+    "Supply-chain protection: slopcheck gate on all AI-recommended packages",
+    "Session persistence and cross-session context handoffs"
+  ],
+  "publicApiSurface": [
+    "npx @opengsd/gsd-core@latest — interactive installer for GSD Core",
+    "/gsd-new-project — initialize a new project",
+    "/gsd-discuss-phase N — pre-planning discussion for a phase",
+    "/gsd-plan-phase N — research + plan + verify for a phase",
+    "/gsd-execute-phase N — execute a phase with wave-based parallelization",
+    "/gsd-verify-work N — user acceptance testing with auto-diagnosis",
+    "/gsd-ship N — create a GitHub pull request",
+    "/gsd-progress — show current position and next steps",
+    "/gsd-autonomous — run all remaining phases autonomously",
+    "/gsd-code-review N — review phase code changes",
+    "/gsd-debug [description] — systematic debugging with persistent state",
+    "/gsd-settings — interactive 6-section configuration wizard",
+    "/gsd-map-codebase — parallel codebase analysis",
+    "/gsd-review --phase N -- cross-AI peer review",
+    "npx @opengsd/gsd-pi@latest — interactive installer for GSD Pi",
+    "gsd — start interactive TUI session",
+    "gsd --web — launch browser-based web interface",
+    "gsd headless [cmd] — run without TUI for CI/automation",
+    "gsd config — re-run provider + API key setup",
+    "gsd worktree <cmd> — manage git worktrees",
+    "gsd graph <cmd> — manage knowledge graph",
+    "/gsd auto — autonomous planning and execution mode",
+    "/gsd new-project — initialize project in Pi",
+    "/gsd ship — ship completed milestone",
+    "/gsd prefs — manage preferences",
+    "/gsd extensions list|enable|disable|install — manage extensions",
+    "npm install -g @opengsd/gsd-browser — install GSD Browser",
+    "gsd-browser mcp — start MCP server for AI agents",
+    "gsd-browser navigate <url> — navigate to a URL",
+    "gsd-browser snapshot — scan page and assign versioned element refs",
+    "gsd-browser click <selector> — click an element",
+    "gsd-browser type <selector> <text> — type text into a field",
+    "gsd-browser record-start / record-stop — record a browser session",
+    "gsd-browser session-save / session-restore — persist browser session state",
+    "gsd-browser viewer-start — start live authenticated viewer"
+  ]
+}
