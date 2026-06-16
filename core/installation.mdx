@@ -142,11 +142,44 @@ npx @opengsd/gsd-core@latest --codex --local
 # Cursor, global
 npx @opengsd/gsd-core@latest --cursor --global
 
+# Windsurf / Devin Desktop, global (--windsurf and --devin-desktop are equivalent)
+npx @opengsd/gsd-core@latest --windsurf --global
+npx @opengsd/gsd-core@latest --devin-desktop --global
+
+# Antigravity, global
+npx @opengsd/gsd-core@latest --antigravity --global
+
 # Cline, global
 npx @opengsd/gsd-core@latest --cline --global
 
 # All supported runtimes, global
 npx @opengsd/gsd-core@latest --all --global
+```
+
+<Note>
+  Windsurf rebranded to **Devin Desktop**. Both `--windsurf` and `--devin-desktop` select the same runtime — use whichever name matches the product you have installed. Global skills always land in `~/.codeium/windsurf/`.
+</Note>
+
+## Workspace directory migrations
+
+Two runtimes have moved their **local** (workspace) install directories to new canonical paths. Fresh `--local` installs write to the new path; the legacy path is still recognized for backward compatibility, so existing projects keep working without manual changes. Global install paths (`~/.codeium/windsurf/`, `~/.gemini/antigravity/`) are unchanged.
+
+| Runtime | New workspace path | Legacy path (still recognized) |
+| --- | --- | --- |
+| Windsurf / Devin Desktop | `.devin/skills/` | `.windsurf/skills/` |
+| Antigravity | `.agents/` | `.agent/` |
+
+When upgrading an existing project, you have two options:
+
+- **Do nothing.** GSD continues to read from the legacy path. This is the safest option for projects shared across teammates who may not have upgraded yet.
+- **Migrate to the new path.** Re-run the installer with `--local` in your project directory. GSD writes new artifacts under the canonical path and the legacy directory can be removed once every collaborator is on a current GSD release.
+
+```bash
+# Migrate a project from .windsurf/skills/ → .devin/skills/
+npx @opengsd/gsd-core@latest --windsurf --local
+
+# Migrate a project from .agent/ → .agents/
+npx @opengsd/gsd-core@latest --antigravity --local
 ```
 
 ## Verify the installation
