@@ -150,6 +150,15 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "GSD Path"
+      },
+      {
+        "tab": "GSD Graph"
+      },
+      {
+        "tab": "GSD Loop"
       }
     ]
   }
