@@ -190,7 +190,26 @@
         ]
       },
       {
-        "tab": "GSD Graph"
+        "tab": "GSD Graph",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "graph/introduction",
+              "graph/installation",
+              "graph/quickstart"
+            ]
+          },
+          {
+            "group": "Use the graph",
+            "pages": [
+              "graph/workflow",
+              "graph/corpus",
+              "graph/mcp",
+              "graph/reference"
+            ]
+          }
+        ]
       },
       {
         "tab": "GSD Loop"

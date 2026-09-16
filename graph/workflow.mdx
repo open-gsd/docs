@@ -1,0 +1,84 @@
+---
+title: "Daily use"
+description: "Refresh project knowledge, retrieve evidence, and maintain facts over time."
+---
+
+Start by checking freshness, then retrieve the evidence you need:
+
+```bash
+gsd-graph status
+gsd-graph sync
+gsd-graph ask "what requirements depend on authentication?"
+```
+
+Run `sync` when your corpus has changed. It fingerprints source files, skips
+unchanged content, re-extracts changed content, and removes provenance for deleted
+sources. A triple remains while it still has supporting provenance.
+
+## Choose a query
+
+| Goal | Command |
+|---|---|
+| Answer a relationship question | `gsd-graph ask "question"` |
+| Browse a term's neighborhood | `gsd-graph query authentication` |
+| Retrieve evidence for your own answer | `gsd-graph pack "question"` |
+| Explain a connection between terms | `gsd-graph why "Auth" "API"` |
+| Find a path between known node IDs | `gsd-graph path <fromId> <toId>` |
+| Summarize corpus themes | `gsd-graph ask "what are the main themes?" --global` |
+| Inspect central nodes | `gsd-graph top` |
+
+Agents should use `ask` or `pack` rather than load the entire store into context.
+Keep answers grounded in the returned citations. An abstention is a valid result.
+
+## Automatic updates
+
+`enable` installs this hook script:
+
+```text
+.gsd-graph/hooks/gsd-graph-update.sh
+```
+
+Connect it to your agent's Bash `PostToolUse` hook. With `enabled` and
+`auto_update` set, matching Git commands start a detached incremental sync on the
+default branch. Hooks skip CI. Set `sync_on_feature_branches: true` in
+`.gsd-graph/config.json` to opt into feature-branch updates, or run `sync` manually.
+
+Check `.gsd-graph/.last-sync-status.json` for the result. Failed detached syncs
+also retain `.last-sync-failure.out` and `.last-sync-failure.err`.
+
+For other editors, use a filesystem watcher or install a Git post-commit hook:
+
+```bash
+gsd-graph watch
+```
+
+```bash
+gsd-graph hook install-git
+```
+
+## Record and correct facts
+
+`assert` and `retract` record changes in `episodes.jsonl`. Full rebuilds replay
+these episodes, so asserted facts and retractions survive a rebuild.
+
+```bash
+gsd-graph assert "Drought" causes "Crop Failure"
+gsd-graph retract <tripleId>
+gsd-graph supersede <winner> <loser>
+```
+
+These writes still pass ontology and provenance checks. Inspect the review queue
+when a fact is not accepted. `supersede` records a decision reversal; superseded
+facts receive lower retrieval priority and are marked in citations.
+
+## Save and restore
+
+```bash
+gsd-graph snapshot save before-corpus-change
+gsd-graph snapshot list
+gsd-graph diff
+```
+
+`gsd-graph snapshot restore before-corpus-change` restores the canonical graph.
+Sidecar files may lag afterward. `gsd-graph repair` regenerates the disposable
+projection; `gsd-graph report` refreshes the human report.
