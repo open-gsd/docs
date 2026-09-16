@@ -49,8 +49,9 @@ resources to change documentation.
 
 Source paths in this table are relative to the `open-gsd/gsd-path` repository root.
 Source links in the published pages point to GitHub so readers can inspect the full contracts.
-When changing a public behavior, update both its source guide and the relevant
-site page. Do not describe historical host receipts as proof of a newer release.
+Each product contract has one authoritative source guide. When behavior changes,
+update that owner and replace stale copies on site pages with a short pointer.
+Do not describe historical host receipts as proof of a newer release.
 
 ## Deploy
 

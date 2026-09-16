@@ -39,7 +39,10 @@ integration validator checks the merge, the milestone tag, and ancestry on
 `origin/main` before the router reports the milestone as shipped.
 
 If a PR is still awaiting merge, the router returns to ship. It does not start
-the next milestone. Archives remain read-only after shipment.
+the next milestone. Archives become read-only when committed, including while
+PR integration is pending. See the
+[archive contract](https://github.com/open-gsd/gsd-path/blob/main/WORKFLOW.md)
+for transaction and retry rules.
 
 ## Let the pipeline own publication
 
