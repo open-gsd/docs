@@ -322,6 +322,8 @@ Check where you are and what comes next.
 /gsd-progress
 /gsd-progress --next
 /gsd-progress --next --auto
+/gsd-progress --next --auto --converge
+/gsd-progress --next --auto --converge --codex --max-cycles 4
 /gsd-progress --do "add rate limiting to the API"
 /gsd-progress --forensic
 ```
@@ -329,6 +331,8 @@ Check where you are and what comes next.
 **What it does**
 
 Your unified situational command. In default mode it shows a progress report and intelligently routes to the next action. With `--next` it advances automatically. With `--do` it maps natural language intent to the most appropriate GSD command, confirms the match, and hands off.
+
+`/gsd-progress --next --auto --converge` is the primary hands-free entry point for plan-review convergence: when the next action is planning, the step is routed through `/gsd-plan-review-convergence` instead of `/gsd-plan-phase`, and the converge mode is preserved across the rest of the `--auto` chain.
 
 **Flags**
 
@@ -340,6 +344,14 @@ Your unified situational command. In default mode it shows a progress report and
   Like `--next`, but after the determined step completes, re-invokes `/gsd-progress --next --auto` automatically to keep chaining steps. Enables hands-free plan → execute → verify progression until a blocking decision is required.
 </ParamField>
 
+<ParamField query="--converge" type="flag">
+  When the next routed action is planning (Route 3), run it through the cross-AI plan-review **convergence** loop instead of `/gsd-plan-phase`. `--cross-ai` is accepted as an alias. Requires `workflow.plan_review_convergence: true` — if the flag is set while the feature gate is off, the command fails fast and prints the enable hint instead of silently falling back to standard planning. When combined with `--auto`, converge mode is forwarded into every re-invocation so the entire chain stays under the convergence policy.
+</ParamField>
+
+<ParamField query="Reviewer flags" type="flag">
+  With `--converge`, reviewer selectors and `--max-cycles N` are forwarded to `/gsd-plan-review-convergence` unchanged: `--codex`, `--gemini`, `--claude`, `--opencode`, `--ollama`, `--lm-studio`, `--llama-cpp`, `--all`, and `--max-cycles N`. See [Cross-AI review](/core/guides/cross-ai-review) for the full reviewer matrix.
+</ParamField>
+
 <ParamField query='--do "task description"' type="string">
   Smart dispatcher. Matches freeform natural language to the best GSD command using routing rules, confirms the match, then hands off execution.
 </ParamField>
@@ -347,6 +359,10 @@ Your unified situational command. In default mode it shows a progress report and
 <ParamField query="--forensic" type="flag">
   Append a 6-check integrity audit after the standard progress report.
 </ParamField>
+
+<Warning>
+  `workflow.plan_review_convergence` is disabled by default. Enable it with `gsd config-set workflow.plan_review_convergence true` before using `--converge`, or the command will exit with the enable hint.
+</Warning>
 
 ---
 

@@ -66,14 +66,27 @@ After `/gsd-review` completes, pass `--reviews` to `/gsd-plan-phase` to replan u
 
 ## Automated convergence loop
 
-Run `/gsd-plan-review-convergence N` to automate the plan → review → replan cycle until no HIGH concerns remain. The command spawns a planning agent and one or more review agents, counts unresolved HIGH concerns in each cycle's `CYCLE_SUMMARY`, and replans automatically until the plan converges or the cycle cap is reached.
+GSD exposes two entry points into the plan → review → replan loop:
+
+- **`/gsd-progress --next --auto --converge`** — the preferred hands-free surface. When `--next` routes to planning, the step is dispatched through `/gsd-plan-review-convergence` automatically, and converge mode is preserved across the rest of the `--auto` chain (plan → execute → verify → next phase). Use this when you want one command to drive the whole milestone under the convergence policy.
+- **`/gsd-plan-review-convergence N`** — the direct command. Use this when you only want to converge the plan for a specific phase without running the rest of the workflow.
+
+Both surfaces require `workflow.plan_review_convergence: true` and accept the same reviewer flags and `--max-cycles N`. `--cross-ai` is accepted as an alias for `--converge` on `/gsd-progress`.
 
 ```bash
+# Direct convergence on a single phase
 /gsd-plan-review-convergence 3                    # Default reviewers, 3 cycles max
 /gsd-plan-review-convergence 3 --codex            # Codex-only convergence loop
 /gsd-plan-review-convergence 3 --all              # All reviewers
 /gsd-plan-review-convergence 3 --all --max-cycles 5   # Extend cap to 5 cycles
+
+# Hands-free via /gsd-progress (planning steps route through convergence)
+/gsd-progress --next --auto --converge
+/gsd-progress --next --auto --converge --codex --max-cycles 4
+/gsd-progress --next --auto --cross-ai --all
 ```
+
+Either way, the underlying loop is the same — `/gsd-progress --next --auto --converge` just wires it into the standard workflow router so you do not have to invoke it phase-by-phase. If you request `--converge` while `workflow.plan_review_convergence` is `false`, the command stops before planning and prints the enable hint instead of silently falling back to `/gsd-plan-phase`.
 
 <Steps>
   <Step title="Plan">
