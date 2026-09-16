@@ -1,0 +1,64 @@
+---
+title: "Skill commands"
+description: "Find the command syntax for your agent and choose the stage to run."
+---
+
+Install the skills first and start a new agent session in your project.
+Enter these commands in the agent chat, not in a shell.
+
+<Tabs>
+  <Tab title="Codex">
+    | Stage | Command |
+    | --- | --- |
+    | Discover | `$gsd-loop-discover` |
+    | Spec | `$gsd-loop-spec` |
+    | Build | `$gsd-loop-build` |
+    | Review | `$gsd-loop-review` |
+    | Schedule | `$gsd-loop-schedule` |
+  </Tab>
+  <Tab title="Claude Code, Cursor, Grok Build">
+    | Stage | Command |
+    | --- | --- |
+    | Discover | `/gsd-loop-discover` |
+    | Spec | `/gsd-loop-spec` |
+    | Build | `/gsd-loop-build` |
+    | Review | `/gsd-loop-review` |
+    | Schedule | `/gsd-loop-schedule` |
+  </Tab>
+  <Tab title="Gemini CLI">
+    | Stage | Command |
+    | --- | --- |
+    | Discover | `Use the gsd-loop-discover skill` |
+    | Spec | `Use the gsd-loop-spec skill` |
+    | Build | `Use the gsd-loop-build skill` |
+    | Review | `Use the gsd-loop-review skill` |
+    | Schedule | `Use the gsd-loop-schedule skill` |
+  </Tab>
+  <Tab title="Kimi Code">
+    | Stage | Command |
+    | --- | --- |
+    | Discover | `/skill:gsd-loop-discover` |
+    | Spec | `/skill:gsd-loop-spec` |
+    | Build | `/skill:gsd-loop-build` |
+    | Review | `/skill:gsd-loop-review` |
+    | Schedule | `/skill:gsd-loop-schedule` |
+  </Tab>
+</Tabs>
+
+## Choose a stage
+
+| Skill | Use it to | Session |
+| --- | --- | --- |
+| `gsd-loop-discover` | Map an uncertain effort or advance an existing map | Interactive |
+| `gsd-loop-spec` | Turn a clear idea or cleared map into queue issues | Interactive |
+| `gsd-loop-build` | Repair one PR or build one ready issue | Build only |
+| `gsd-loop-review` | Audit one PR and record a verdict | Review only |
+| `gsd-loop-schedule` | Create or update a recurring build or review task | The lane being scheduled |
+
+Discovery and spec may share a session. Keep build and review in separate
+sessions. Each direct stage invocation runs one pass and stops. Use
+[scheduling](/loop/scheduling) for repeated passes.
+
+The installed skills include the playbooks and their deterministic helpers.
+You do not need a globally installed `gsd-loop` shell command to run a stage.
+The npm CLI installs skills and prepares repositories; it does not launch agents.

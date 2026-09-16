@@ -1,0 +1,198 @@
+---
+title: "Installation"
+description: "Install the five skills, connect your GitHub repository, and check build and review readiness."
+---
+
+`@opengsd/gsd-loop` installs five Agent Skills and provides deterministic
+repository setup and readiness checks. The package never launches an agent;
+discover, spec, build, review, and scheduling run inside your coding agent.
+After setup, follow the [quickstart](/loop/quickstart).
+
+## Supported hosts
+
+| Agent application | Skill location | Invocation |
+|---|---|---|
+| [Codex](https://developers.openai.com/codex/skills/) | `~/.agents/skills` | `$gsd-loop-*` |
+| [Claude Code](https://code.claude.com/docs/en/skills) | `~/.claude/skills` adapter | `/gsd-loop-*` |
+| [Cursor](https://cursor.com/docs/skills) | `~/.cursor/skills` adapter | `/gsd-loop-*` |
+| [Gemini CLI](https://geminicli.com/docs/cli/creating-skills/) | `~/.gemini/skills` adapter | Natural-language request |
+| [Grok Build](https://docs.x.ai/build/features/skills-plugins-marketplaces) | `~/.grok/skills` adapter | `/gsd-loop-*` |
+| [Kimi Code](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/skills.html) | `~/.agents/skills` | `/skill:gsd-loop-*` |
+
+`~/.agents/skills` is the canonical source for Codex and Kimi. Claude, Cursor,
+Gemini, and Grok use symlinks from their native global directories when
+supported and safe copies otherwise. Installing a skill does not install,
+authenticate, select, or launch a model or agent application.
+
+## Prerequisites
+
+Standalone skill installation requires Node.js 18 or newer, including `npm`
+and `npx`. It does not require Git, a GitHub repository, an authenticated `gh`
+CLI, or an installed agent harness. Using the skills requires a supported
+agent harness with shell access.
+
+`init` and repository setup additionally require:
+
+- Git;
+- the [`gh` CLI](https://cli.github.com/) authenticated with push access.
+
+Creating a repository also requires a configured Git author name and email.
+
+Before review, the repository must have a real successful CI check. gsd-loop
+can require an existing check, but it does not invent an always-green workflow.
+Creating or updating the dedicated required-CI ruleset also requires repository
+administration access or a custom role with permission to edit repository
+rules. Without that permission, setup keeps the build lane ready and leaves
+review blocked.
+
+## Choose an onboarding path
+
+### Install before GitHub
+
+Install the five skills before creating or connecting a GitHub repository:
+
+```bash
+npx @opengsd/gsd-loop@latest install --dry-run
+npx @opengsd/gsd-loop@latest install
+```
+
+This command does not prepare labels, CI rules, or repository-local state.
+After the repository is on GitHub, run `init` from its local checkout to finish
+repository setup.
+
+### Install and initialize together
+
+Run this inside an existing GitHub checkout:
+
+```bash
+npx @opengsd/gsd-loop@latest init
+```
+
+`init` previews every planned change and asks once before it:
+
+- installs or updates all five skills;
+- verifies GitHub access;
+- creates the five queue/review `gsd:*` labels without replacing existing
+  labels; the first discovery pass creates `gsd:map` when needed;
+- locally excludes `.gsd/scheduled_tasks.lock` so native scheduling cannot make
+  the main checkout look dirty to a builder pass;
+- when one successful check is selected, creates or updates only the dedicated
+  `gsd-loop required CI` ruleset.
+
+It does not detect an agent CLI, request autonomous permissions, write runner
+configuration, or start background work.
+
+If review is not already protected and no successful CI check exists yet,
+setup exits with status `3` after making the build lane ready. Add CI through
+the first spec/build issue, wait for it to run successfully, then rerun `init`
+before starting the reviewer.
+
+GitHub repository plans do not all expose rulesets for private repositories.
+When the account plan or repository permissions prevent the dedicated ruleset,
+`init` keeps the build lane ready, leaves review blocked, and reports the
+limitation. It never rewrites unrelated branch protection.
+
+### Start from an empty directory
+
+Interactive `init` offers a private repository named after the directory. It
+creates `main` with one empty initial commit, so no project files are staged or
+invented.
+
+For unattended setup, repository creation requires every external choice:
+
+```bash
+npx @opengsd/gsd-loop@latest init --yes \
+  --create-repo \
+  --repo OWNER/NAME \
+  --visibility private
+```
+
+In native Windows PowerShell:
+
+```powershell
+npx @opengsd/gsd-loop@latest init --yes `
+  --create-repo `
+  --repo OWNER/NAME `
+  --visibility private
+```
+
+The equivalent Command Prompt command is:
+
+```bat
+npx @opengsd/gsd-loop@latest init --yes --create-repo --repo OWNER/NAME --visibility private
+```
+
+`--yes` never implies `--create-repo`. Automatic creation is limited to an
+empty, non-Git directory.
+
+### Choose CI explicitly
+
+When several successful checks exist, interactive setup asks which one to
+require. Unattended setup must identify it:
+
+```bash
+npx @opengsd/gsd-loop@latest init --yes --required-check test
+```
+
+## Readiness checks
+
+Human-readable checks:
+
+```bash
+npx @opengsd/gsd-loop@latest doctor
+npx @opengsd/gsd-loop@latest doctor --review-ready
+```
+
+Machine-readable output:
+
+```bash
+npx @opengsd/gsd-loop@latest doctor --json --repo OWNER/NAME
+```
+
+Exit status `0` means the requested readiness level passed, `1` is an
+operational failure, `2` is invalid usage, and `3` means setup is safely waiting
+for human action.
+
+## Skill installation options
+
+Select which hosts receive native adapters or choose adapter behavior when
+necessary:
+
+```bash
+npx @opengsd/gsd-loop@latest install --agents codex,cursor,gemini,grok,kimi
+npx @opengsd/gsd-loop@latest install --adapter-mode copy
+```
+
+The canonical five-skill bundle is always installed because every adapter
+references it and Codex and Kimi use it directly. `--agents` limits the native
+adapter directories added for Claude, Cursor, Gemini, and Grok.
+
+Before writing, the installer preflights the canonical bundle and every
+selected adapter destination. A conflicting unowned path stops the installation
+before anything is replaced. Each replacement is staged beside its destination
+and restores that destination from its backup if the replacement fails.
+Use `--home PATH` only for an alternate user profile or isolated test root.
+
+On native Windows, the canonical skill directory is
+`%USERPROFILE%\.agents\skills`. Claude, Cursor, Gemini, and Grok adapters are
+installed under `%USERPROFILE%\.claude\skills`,
+`%USERPROFILE%\.cursor\skills`, `%USERPROFILE%\.gemini\skills`, and
+`%USERPROFILE%\.grok\skills`.
+PowerShell users can preview an alternate profile without WSL:
+
+```powershell
+npx @opengsd/gsd-loop@latest install --dry-run --home "$env:USERPROFILE\gsd-loop-profile"
+```
+
+The Python 3.10+ source-checkout installer remains a skill-only fallback when
+installing through npm or npx is unavailable. Node.js 18+ is still required to
+execute the bundled deterministic helpers:
+
+```bash
+python3 scripts/install-global.py --dry-run
+python3 scripts/install-global.py
+```
+
+
+After installing or updating, start a new agent session. See
+[skill commands](/loop/skills) and [troubleshooting](/loop/troubleshooting).

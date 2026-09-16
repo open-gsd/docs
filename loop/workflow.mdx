@@ -1,0 +1,81 @@
+---
+title: "Workflow and issue contracts"
+description: "Understand discovery, specification, build, review, and the labels that control the queue."
+---
+
+The GitHub issue defines the product scope. The builder implements its
+`O-N` outcomes; the reviewer checks the result against them. `X-N` exclusions
+state what must remain outside the change.
+
+## Discover an uncertain effort
+
+Run `gsd-loop-discover` with a human present. A discovery map records the
+destination, decisions, unresolved questions, scope boundary, and delivery
+slices. It uses `gsd:map` and never enters the build queue.
+
+An advance resolves at most one frontier decision. Once the frontier is clear,
+a pass may re-chart the effort, graduate it to specification, or stop. The map
+and decision issues preserve context between sessions. Use one writer per map.
+
+## Specify the work
+
+Run `gsd-loop-spec` for a clear idea or a cleared discovery map. The agent reads
+the code, interviews you, and drafts issues with outcomes, exclusions, code
+pointers, testing notes, and a manual walkthrough.
+
+Review the complete draft before it is filed. Each delivery slice becomes a
+separate queue issue. A dependency uses `Needs #N merged`; closing the predecessor
+without merged code does not satisfy it. Add `gsd:ready` to each approved issue.
+
+When scope changes after filing, update the issue contract through spec. A
+contract edit requires fresh review evidence even if the PR commit is unchanged.
+
+## Build one unit of work
+
+The builder checks for interrupted work, then gives eligible `gsd:rework` PRs
+priority. If no repair is selected, it chooses the oldest safe `gsd:ready`
+issue whose dependencies are satisfied. It skips maps, blocked or escalated
+issues, and issues already claimed by another worker.
+
+Implementation happens in an isolated worktree. The builder tests the outcomes
+and opens a PR linked to the issue. Ambiguity goes back to you as a blocking
+question; the builder must not invent product scope.
+
+Run only one builder per repository. Issue assignment is a cooperative claim,
+not an atomic lock.
+
+## Review one PR
+
+Run the reviewer in a separate session. It checks the linked issue, current
+commit, contract fingerprint, implementation, and required CI. Its verdict has
+blocking findings, advisory findings, and merge evidence.
+
+Required CI and dependency security remain independent gates. A manifest or
+lockfile change needs a machine-readable comparison of baseline and branch
+advisories. New high or critical advisories block approval. Missing required
+checks cannot count as green CI.
+
+A trusted verdict identifies the commit, issue, and contract version. The
+reviewer can restore labels and outcome checkboxes from matching evidence after
+an interruption. New commits or contract edits require a fresh review; changing
+only outcome checkboxes preserves the contract fingerprint.
+
+Three blocking verdicts on distinct commits since the last human-cleared
+escalation move the PR to `gsd:escalated` instead of continuing repair.
+
+## Read the labels
+
+| Label | Meaning | Your next action |
+| --- | --- | --- |
+| `gsd:map` | Discovery planning state | Resolve decisions, then pass cleared slices to spec |
+| `gsd:ready` | You approved an issue for build | Leave it queued for the builder |
+| `gsd:blocked` | An issue needs your answer | Answer, then remove this label |
+| `gsd:rework` | A PR has blocking review findings | Let the builder repair it |
+| `gsd:approved` | Review evidence is complete | Inspect the evidence and decide whether to merge |
+| `gsd:escalated` | Automation needs human intervention | Resolve the cause, then remove this label |
+
+Approval can be invalidated when the commit, linked issue, contract, or required
+merge evidence changes. Always read the latest verdict before merging.
+
+See [skill commands](/loop/skills) to run a stage and
+[troubleshooting](/loop/troubleshooting) to resume blocked work.
