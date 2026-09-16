@@ -1,0 +1,47 @@
+---
+title: "Project artifacts"
+description: "Find the files that hold scope, decisions, task contracts, verification, and shipment history."
+---
+
+All paths below are relative to `.project/`. Read the canonical artifact when
+a summary disagrees with it. Do not hand-edit state to move the pipeline.
+
+| Path | Purpose |
+| --- | --- |
+| `STATE.md` | Phase, milestone branch, integration choice, and archive transaction |
+| `REPOSITORY.md` | Approved binding for a newly created GitHub repository |
+| `CHARTER.md` | Program scope, constraints, and vetoes |
+| `ROADMAP.md` | Approved milestone slicing |
+| `SYNTHESIS.md` | Program decisions |
+| `intent/INTENT.md` | Milestone outcome, criteria, constraints, and vetoes |
+| `research/evidence-codebase.md` | Inspection findings |
+| `research/DOCS-AUDIT.md` | Documentation claim verdicts and remediation queue |
+| `research/RESEARCH.md` | Research dispatch manifest |
+| `research/evidence-*.md` | Research evidence |
+| `research/SYNTHESIS.md` | Milestone decisions |
+| `plan/PLAN.md` | Waves, dependencies, intent coverage, and project Verify |
+| `tasks/T###-slug.md` | Task scope, allowed files, criteria, and recorded results |
+| `review/` | Wave evidence, final reviews, and patch findings |
+| `discuss/DIALOGUE.md` | Append-only discussion transcript |
+| `discuss/ANSWERS.md` | Answers, named owners, and disposition receipts |
+| `next/` | Lookahead planning for the next program milestone |
+| `LESSONS.md` | Optional lessons carried into later planning |
+| `archive/` | Frozen milestone artifacts and manifests |
+
+## What stays active after ship
+
+State, repository binding, lessons, lookahead, and program-level charter,
+roadmap, and synthesis remain active. Milestone artifacts move into a named
+archive directory. See [shipping](/path/shipping) for archive protection and
+integration rules.
+
+## What has authority
+
+User rulings come first. Program charter constraints apply to all milestones.
+Intent criteria and vetoes constrain later work. Settled synthesis decisions
+and the current phase or task contract further define the work.
+
+If sources conflict, the pipeline stops and surfaces the conflict. A task log
+or review cannot waive an intent criterion. See
+[the operating rules](https://github.com/open-gsd/gsd-path/blob/main/AGENTS.md)
+for the full authority and handoff contracts.

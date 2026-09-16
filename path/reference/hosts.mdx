@@ -1,0 +1,42 @@
+---
+title: "Supported hosts"
+description: "Choose installer flags and find the router syntax for each supported coding agent."
+---
+
+Support means an installer target and dispatch contract exist. Live milestone
+evidence and guard coverage are tracked separately in the
+[host trust matrix](https://github.com/open-gsd/gsd-path/blob/main/docs/trust-validation/HOST-MATRIX.md).
+Use that matrix when evaluating a particular release.
+
+| Host | Install flag | Router invocation |
+| --- | --- | --- |
+| Codex | `--codex` | `$gsd-path` or `$path` |
+| Claude Code | `--claude` | `/gsd-path` or `/path` |
+| Grok | `--grok` | `/gsd-path` or `/path` |
+| OpenCode v2 | `--opencode` | `/gsd-path` or `/path` |
+| GitHub Copilot CLI | `--copilot` | `/gsd-path` or `/path` |
+| Qwen Code | `--qwen` | `/gsd-path` or `/path` |
+| Antigravity CLI | `--antigravity` | `/gsd-path` or `/path` |
+| Cursor | `--cursor` | `/gsd-path` or `/path` |
+| Zed | `--zed` | `/gsd-path` or `/path` |
+| Kiro | `--kiro` | `/gsd-path` or `/path` |
+| Kimi Code | `--kimi` | `/gsd-path` or `/path` |
+
+For OpenCode stable, ask the agent to load and use the `gsd-path` skill.
+Individual phases retain the `gsd-path-` prefix on every host.
+
+## Locate installed skills
+
+Codex and Zed share `~/.agents/skills`. Claude Code uses `~/.claude/skills`,
+and Cursor uses `~/.cursor/skills`. Other hosts use their host-specific roots.
+Project-local installs use the corresponding project skill directories.
+
+Run the installer with `--dry-run` to see resolved paths for your selected
+hosts. Run `node scripts/install.mjs --help` from the clone for flags and root
+overrides. Restart the host after installing or updating.
+
+## Check the enforcement boundary
+
+Git hooks protect Git operations across hosts. Native tool hooks are installed
+for selected Claude Code, Codex, and Cursor targets. Codex needs manual trust
+activation. See [guard hooks](/path/guard-hooks) and the trust matrix for limitations.

@@ -1,0 +1,74 @@
+---
+title: "Installation"
+description: "Choose global or project-local skills and install the project contracts your pipeline needs."
+---
+
+GSD Path has two install layers: host skills and project contracts. Skills
+provide the router and phase commands. Project contracts add `AGENTS.md`,
+`WORKFLOW.md`, and the `.gsd-path/` status runtime to the target repository.
+Selecting Claude Code also installs `.claude/CLAUDE.md`.
+
+## Prerequisites
+
+- Node.js 18.17 or newer for the installer.
+- Python 3.9 or newer for project installs.
+- Git for branch binding, task isolation, and shipment.
+- A host from the [supported host table](/path/reference/hosts).
+
+The examples use a [clone of GSD Path](/path/quickstart). Commands with
+`scripts/install.mjs` run from that clone unless the example uses an absolute path.
+
+## Choose where skills live
+
+| Scope | Use when | Command from the GSD Path clone |
+| --- | --- | --- |
+| Global | You use Path across repositories | `node scripts/install.mjs --codex` |
+| Selected hosts | You use more than one agent | `node scripts/install.mjs --claude --cursor` |
+| All hosts | You need every supported adapter | `node scripts/install.mjs --all` |
+
+Add `--dry-run` first to preview the selected targets without writing files.
+With no flags in an interactive terminal, `node scripts/install.mjs` opens the
+installation wizard.
+
+For project-local skills, run the installer by absolute path from the target
+repository. Replace both paths:
+
+```bash
+cd /absolute/path/to/your-project
+node /absolute/path/to/gsd-path/scripts/install.mjs --codex --local --dry-run
+node /absolute/path/to/gsd-path/scripts/install.mjs --codex --local
+```
+
+## Add project contracts
+
+From the GSD Path clone:
+
+```bash
+node scripts/install.mjs --codex --project /absolute/path/to/your-project --dry-run
+node scripts/install.mjs --codex --project /absolute/path/to/your-project
+```
+
+An initial install refuses existing managed contracts. Use
+[the update flow](/path/updating) to keep those contracts and refresh managed skills
+and runtime files. Merge contract changes by hand.
+
+For optional archive and Git protection, see [guard hooks](/path/guard-hooks).
+
+## Check the installation
+
+```bash
+node scripts/install.mjs --doctor --project /absolute/path/to/your-project
+```
+
+Doctor is a read-only check of skills, hooks, and pipeline state. Restart your
+agent after installing or updating, then [invoke the router](/path/quickstart).
+
+## Other entry points
+
+The package declares the `gsd-path` npm command. If your chosen release is
+available on npm, you can use `npx gsd-path --all --dry-run` and
+`npx gsd-path --all` without a clone. The clone instructions above do not depend
+on npm publication.
+
+The Python installer, `scripts/install.py`, also supports global, local, and
+update installs. The Node CLI owns the interactive wizard.

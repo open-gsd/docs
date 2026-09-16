@@ -1,0 +1,74 @@
+---
+title: "Quickstart"
+description: "Install GSD Path from a clone and start a milestone in an existing Git repository."
+---
+
+You need Node.js 18.17 or newer, Python 3.9 or newer available as `python3` or
+`python`, Git, and a [supported agent host](/path/reference/hosts). Use an existing
+Git repository with a clean working tree and an `origin/main` branch for this
+walkthrough.
+
+<Steps>
+  <Step title="Clone GSD Path and install your skills">
+    Run these commands in the directory where you keep source repositories:
+
+    ```bash
+    git clone https://github.com/open-gsd/gsd-path.git
+    cd gsd-path
+    node scripts/install.mjs --codex --dry-run
+    node scripts/install.mjs --codex
+    ```
+
+    Replace `--codex` with your host flag, combine flags such as
+    `--claude --cursor`, or use `--all` for every supported host.
+  </Step>
+  <Step title="Add project rules">
+    Stay in the GSD Path clone. Replace `/absolute/path/to/your-project` with
+    your target repository's absolute path:
+
+    ```bash
+    node scripts/install.mjs --codex --project /absolute/path/to/your-project --dry-run
+    node scripts/install.mjs --codex --project /absolute/path/to/your-project
+    ```
+
+    This installs project rules and the local status runtime. If managed
+    contracts already exist, installation refuses to overwrite them. Follow
+    [updating an existing project](/path/updating) instead.
+  </Step>
+  <Step title="Open the target project and restart your agent">
+    Start a new agent session in your target repository so it loads the skills.
+    Invoke the router:
+
+    <Tabs>
+      <Tab title="Codex">
+        ```text
+        $gsd-path
+        ```
+      </Tab>
+      <Tab title="Claude Code and other slash hosts">
+        ```text
+        /gsd-path
+        ```
+      </Tab>
+    </Tabs>
+
+    For OpenCode stable, ask the agent to load and use the `gsd-path` skill.
+  </Step>
+  <Step title="Define the outcome and review the plan">
+    Describe what you want to achieve, who will use it, how you will know it
+    works, and what is out of scope. Review the linked intent draft before
+    approval. Review the wave summary and task scope before approving build.
+
+    The router stops for required decisions. A directly invoked phase skill
+    stops at its handoff; invoke the router again to continue.
+  </Step>
+  <Step title="Review and ship">
+    Build produces task evidence and wave reviews. Ship checks the final
+    criteria and asks for approval. If review blocks, the pipeline prepares
+    patch work. Follow [shipping](/path/shipping) for direct and pull-request modes.
+  </Step>
+</Steps>
+
+<Card title="Know what happens next" icon="route" href="/path/workflow">
+  Read the phase outputs, approval gates, and quick-lane rules.
+</Card>

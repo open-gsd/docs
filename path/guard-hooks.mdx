@@ -1,0 +1,55 @@
+---
+title: "Guard hooks"
+description: "Install optional archive and Git guards and understand the host-specific enforcement boundary."
+---
+
+Guard hooks add deterministic checks around archive writes, protected Git
+operations, and pipeline publication. They complement the pipeline's written
+contracts. Git hooks and native tool hooks have different coverage.
+
+## Install guards
+
+Use an initialized Git repository and Python 3.9 or newer. Run from the GSD
+Path clone when installing project contracts for the first time:
+
+```bash
+node scripts/install.mjs --claude --codex --cursor --project /absolute/path/to/your-project --hooks --dry-run
+node scripts/install.mjs --claude --codex --cursor --project /absolute/path/to/your-project --hooks
+```
+
+Select only the hosts you use. For an existing project with contracts, add
+guards without replacing those contracts:
+
+```bash
+node scripts/install.mjs --hooks-init --codex --project /absolute/path/to/your-project --dry-run
+node scripts/install.mjs --hooks-init --codex --project /absolute/path/to/your-project
+```
+
+## Understand enforcement
+
+| Layer | What it checks |
+| --- | --- |
+| Git hooks | Commit and push operations through `pre-commit`, `commit-msg`, and `pre-push` |
+| Native host hooks | Tool calls before execution on selected Claude Code, Codex, and Cursor installs |
+| Pipeline helpers | State transitions, isolation, archive transactions, and integration proof |
+
+The installer resolves the effective Git hooks directory, including
+`core.hooksPath` and linked worktrees. Native guards reject malformed events
+or events they cannot validate.
+
+<Note>
+  Codex requires you to review and trust the project hook configuration in
+  `/hooks`. Until activation is complete, treat the installation as Git-only
+  enforcement. Review changed hook definitions again after updates.
+</Note>
+
+## Recognize expected blocks
+
+Guards can reject writes to shipped archives, destructive Git commands,
+ambiguous shell destinations, changes to routing controls, and publication
+outside the ship contract. Read the reported reason and use the named pipeline
+helper or [forensics](/path/recovery) to proceed.
+
+The precise command rules and host caveats live in
+[HOOKS.md](https://github.com/open-gsd/gsd-path/blob/main/HOOKS.md).
+See [updating](/path/updating) to refresh installed guards.

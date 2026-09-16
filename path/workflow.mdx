@@ -1,0 +1,67 @@
+---
+title: "Phases and approvals"
+description: "Understand the milestone lifecycle, saved evidence, and decisions that need your approval."
+---
+
+The router selects work from saved project state. You control the scope,
+approval gates, and unresolved decisions. Each phase leaves a reviewable file
+for the next phase.
+
+## Phase outputs
+
+| Phase | What happens | What you review |
+| --- | --- | --- |
+| Inspect | Map existing code and audit documentation claims | Codebase evidence and documentation conflicts |
+| Define | Record the outcome, users, criteria, constraints, and vetoes | `intent/INTENT.md` and intent playback |
+| Research | Investigate open questions; record skipped dimensions | Evidence files and the research manifest |
+| Decide | Turn cited evidence into decisions | `research/SYNTHESIS.md`; unresolved `NEEDS-USER` choices |
+| Plan | Map criteria to tasks, dependencies, and verification | `plan/PLAN.md` and the wave summary |
+| Build | Implement tasks, verify isolated patches, and review waves | Task logs, escalations, and wave reviews |
+| Ship | Check final criteria, archive, and integrate | Final review and shipment approval |
+
+Paths in this table are relative to `.project/`. [Programs](/path/programs) also use
+a charter and a roadmap above the milestone loop.
+
+## Start from the actual project
+
+For an existing repository, inspection runs before definition. Documentation
+conflicts need your ruling: fix the documentation, fix the code, or accept the
+drift. Inspection does not resolve the conflict for you.
+
+For a new project, definition starts with the intended result. State what is in
+scope and what is excluded. Vetoes remain binding during research, planning,
+and implementation.
+
+## Choose a lane
+
+The quick lane applies to at most two deliverable tasks in one wave with no
+open questions or cross-wave risk, as defined in the
+[full guide](https://github.com/open-gsd/gsd-path/blob/main/FULL.md#quick-lane).
+It may skip research and decision work using settled inputs. If the plan
+outgrows that contract, it returns to the standard lane and research.
+
+The standard lane gathers evidence before planning. Program milestones derive
+their scope from the approved roadmap and revisit research when questions remain.
+
+## Approve a concrete artifact
+
+A handoff names the outcome, links the review file, and states the next action.
+Read that file before approving. Plan approval creates a checkpoint before
+build begins. Final-review patch selection also needs your approval before
+patch planning starts. A discussion answer does not approve a plan or advance
+a phase.
+
+## How build verifies work
+
+Task contracts name allowed files, acceptance criteria, interfaces, and a Verify
+command. The orchestrator checks those briefs before dispatch. Parallel tasks
+use isolated named branches and worktrees; a serial dispatch works on the
+bound milestone branch. Task landing stays serial.
+
+The orchestrator reruns each task's Verify against its isolated patch. Wave
+review uses that recorded evidence. The project Verify runs at ship through
+the final-review runtime. A wave advances only after all its tasks and its
+wave review pass.
+
+For the full agent contract, read
+[WORKFLOW.md](https://github.com/open-gsd/gsd-path/blob/main/WORKFLOW.md).

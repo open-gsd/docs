@@ -1,0 +1,54 @@
+---
+title: "Shipping and integration"
+description: "Review final evidence and complete shipment through direct integration or a user-merged pull request."
+---
+
+Shipping proves that the milestone meets its approved criteria, preserves its
+evidence, and integrates the result with `main`. A passing build alone is not
+a completed shipment.
+
+## Before shipping
+
+Every task and wave review must pass. Ship runs the project Verify through its
+owned runtime and checks the final gap verdicts. Any `not-met`, `unverifiable`,
+or blocked result prevents shipment.
+
+If final review finds a contract gap, it returns the finding through patch
+planning and build. Reviewers report findings; they do not edit product code.
+
+## Choose an integration mode
+
+The project has an integration default, and a milestone can override it before
+build. Use the pipeline to make this choice; do not hand-edit state.
+
+| Mode | Integration behavior | Your action |
+| --- | --- | --- |
+| Direct | Path creates and pushes the canonical non-fast-forward merge to `main` | Approve shipment after reviewing the evidence |
+| Pull request | Path creates or reuses its GitHub PR | Merge the approved PR with a merge commit |
+
+<Warning>
+  Pull-request mode requires a merge commit. Squash and rebase merges do not
+  satisfy Path's two-parent integration proof. Path does not auto-merge the PR.
+</Warning>
+
+## Archive and prove integration
+
+Ship creates one `.project/`-only commit on the bound milestone branch. It
+moves milestone artifacts to `.project/archive/` with a manifest. The
+integration validator checks the merge, the milestone tag, and ancestry on
+`origin/main` before the router reports the milestone as shipped.
+
+If a PR is still awaiting merge, the router returns to ship. It does not start
+the next milestone. Archives become read-only when committed, including while
+PR integration is pending. See the
+[archive contract](https://github.com/open-gsd/gsd-path/blob/main/WORKFLOW.md)
+for transaction and retry rules.
+
+## Let the pipeline own publication
+
+All milestone work uses the branch recorded in state, such as `gsd-path/M001`.
+The ship transaction owns publication from that branch. Do not use a separate
+push, PR, or general-purpose release workflow to bypass it.
+
+If shipment stops during an archive or integration transaction, preserve the
+files and follow [the recovery flow](/path/recovery).

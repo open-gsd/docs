@@ -1,0 +1,40 @@
+---
+title: "Skill reference"
+description: "Find the router, phase skills, and tools that work alongside the pipeline."
+---
+
+Use `$skill-name` in Codex and `/skill-name` on slash-command hosts. The router
+is the normal entry point. A directly invoked phase skill handles its phase
+and stops at a handoff.
+
+## Router and phases
+
+| Skill | Purpose |
+| --- | --- |
+| `path` | Short alias for `gsd-path` |
+| `gsd-path` | Read state and route the next phase; `status` is read-only |
+| `gsd-path-inspect` | Map existing code and audit documentation |
+| `gsd-path-define` | Define intent or a program charter |
+| `gsd-path-research` | Gather evidence for open questions |
+| `gsd-path-decide` | Record decisions supported by evidence |
+| `gsd-path-roadmap` | Slice a program into milestones |
+| `gsd-path-plan` | Create waves, task contracts, and verification coverage |
+| `gsd-path-build` | Dispatch implementation, verify tasks, and review waves |
+| `gsd-path-ship` | Run final review, archive, and integrate |
+
+## Supporting skills
+
+| Skill | Purpose |
+| --- | --- |
+| `gsd-path-discuss` | Record questions and decisions during a non-shipped phase |
+| `gsd-path-docs-audit` | Check documentation claims against the code |
+| `gsd-path-loop` | Run a bounded check and fix loop from a `LOOP.md` contract |
+| `gsd-path-forensics` | Diagnose a stuck pipeline without changing it |
+| `gsd-path-migrate` | Import Core context and review hook coexistence |
+| `gsd-path-undo` | Undo unpublished work through pipeline helpers |
+
+Discussion does not approve or advance phases. The loop runner does not
+advance gates, commit, or push. See [recovery](/path/recovery) before attempting to
+repair a blocked run.
+
+Source: [installed skill catalog](https://github.com/open-gsd/gsd-path/blob/main/README.md#skills).

@@ -1,0 +1,67 @@
+---
+title: "Resume, discuss, and recover"
+description: "Continue from saved state, resolve open questions, and diagnose blocked work without bypassing gates."
+---
+
+GSD Path saves handoffs in `.project/`. Resume in the same project directory
+with the explicit router. A fresh session reads those files to recover the
+current phase.
+
+## Inspect status
+
+<Tabs>
+  <Tab title="Codex">
+    ```text
+    $gsd-path status
+    ```
+  </Tab>
+  <Tab title="Slash-command hosts">
+    ```text
+    /gsd-path status
+    ```
+  </Tab>
+</Tabs>
+
+Status reports without advancing. Invoke the router without `status` when you
+want to continue. Follow the linked artifact and exact next action it returns.
+
+## Discuss an assumption or decision
+
+Use `$gsd-path-discuss` in Codex or `/gsd-path-discuss` on slash-command hosts
+during a non-shipped phase. Discussion reads phase artifacts and records the
+conversation in `discuss/DIALOGUE.md` and `discuss/ANSWERS.md`.
+
+A required follow-up remains pending until its named owner records how it was
+applied or acknowledged. It cannot silently disappear or waive an approved
+criterion. Discussion does not change phase state or commit code.
+
+## Diagnose blocked work
+
+Use `$gsd-path-forensics` or `/gsd-path-forensics` for read-only diagnosis.
+Keep the exact error and the canonical artifact it names. If a helper fails,
+follow its diagnosis and recovery contract; do not repair state or Git by hand.
+
+For an intent correction or structural plan problem during a blocked build,
+use the pipeline's
+[build recovery contract](https://github.com/open-gsd/gsd-path/blob/main/skills/gsd-path/references/build-recovery.md).
+The recovery path preserves valid landed work and returns contract changes to
+the phase that owns them.
+
+## Undo unpublished work
+
+Invoke `gsd-path-undo` for helper-owned undo. Do not substitute a manual reset,
+delete an archive, or start a competing build to escape a blocked state.
+
+## Common symptoms
+
+| Symptom | Next action |
+| --- | --- |
+| New skills do not appear | Restart your agent session and check [host paths](/path/reference/hosts) |
+| “Continue” only prints status | Invoke the explicit router |
+| Installer refuses existing contracts | Use [the update flow](/path/updating) |
+| Required discussion follow-up blocks progress | Read the answer and its named owner action |
+| All work passed but shipment is pending | Check PR merge and integration proof in [shipping](/path/shipping) |
+| State is foreign, ambiguous, or invalid | Use forensics and follow the reported recovery route |
+
+For installation health, run `node scripts/install.mjs --doctor --project
+/absolute/path/to/your-project` from the GSD Path clone.
