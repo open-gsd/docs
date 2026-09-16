@@ -1,0 +1,44 @@
+---
+title: "Scheduling"
+description: "Repeat build or review passes with native recurring tasks and clear stop conditions."
+---
+
+Scheduling requires a host with native recurring tasks. Each task wakes one
+lane, runs one pass, records the result, and applies the scheduling policy.
+
+## Start a lane
+
+Open the build session and invoke `gsd-loop-schedule` using
+[your host's syntax](/loop/skills). Build is the default lane. To schedule
+review, open a separate session, invoke the skill, and explicitly request review.
+
+The skill checks repository readiness before creating a task. Review requires
+`doctor --review-ready` to pass. It updates a matching task instead of creating
+a duplicate and refuses another active builder for the same repository.
+
+## Cadence and stop conditions
+
+The scheduling skill defines this policy:
+
+| Result | Task behavior |
+| --- | --- |
+| Productive pass | Reset the idle count and repeat after 15 minutes |
+| Idle pass | Repeat after 60 minutes |
+| Three consecutive idle passes | Pause the task |
+| Blocked pass | Pause and report the cause |
+
+Credentials, permissions, unrelated dirty worktrees, and escalations can block
+a pass. The task requires the final `GSD_LOOP_RESULT` line; missing or malformed
+output is blocked, never inferred to be success.
+
+Resolve a reported blocker before invoking the scheduling skill again. After
+an idle pause, use it again when new work is available.
+
+## Keep sessions separate
+
+Build and review use separate chats and scheduled tasks. Never schedule
+discovery or spec: they require a human. The scheduler does not merge PRs,
+enable auto-merge, force-push, or run multiple builders for one repository.
+
+If the host has no native recurring-task capability, run each build or review
+pass manually. GSD Loop does not start a shell loop or launch another agent CLI.

@@ -193,7 +193,32 @@
         "tab": "GSD Graph"
       },
       {
-        "tab": "GSD Loop"
+        "tab": "GSD Loop",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "loop/introduction",
+              "loop/quickstart",
+              "loop/installation"
+            ]
+          },
+          {
+            "group": "Run the loop",
+            "pages": [
+              "loop/workflow",
+              "loop/skills",
+              "loop/scheduling",
+              "loop/troubleshooting"
+            ]
+          },
+          {
+            "group": "Maintainers",
+            "pages": [
+              "loop/releasing"
+            ]
+          }
+        ]
       }
     ]
   }

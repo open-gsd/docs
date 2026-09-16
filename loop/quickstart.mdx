@@ -1,0 +1,82 @@
+---
+title: "Quickstart"
+description: "Prepare a GitHub repository and take a clear idea through specification, build, and review."
+---
+
+For this walkthrough, you need Node.js 18 or newer, Git, an authenticated
+`gh` CLI with push access, and a [supported coding agent](/loop/skills).
+Use a local checkout of a GitHub repository. Review also needs required CI
+checks on its default branch.
+
+<Steps>
+  <Step title="Prepare your repository">
+    From the local checkout, run:
+
+    ```bash
+    npx @opengsd/gsd-loop@latest init
+    ```
+
+    Read the preview and approve the changes. Setup installs the five skills,
+    prepares labels, and checks readiness. It can require an existing successful
+    CI check when your permissions and GitHub plan support rulesets.
+
+    If you have not created a repository yet, you can first run
+    `npx @opengsd/gsd-loop@latest install`. See [installation](/loop/installation).
+  </Step>
+  <Step title="Specify a clear idea">
+    Start a new agent session in your project and invoke `gsd-loop-spec` using
+    [your host's syntax](/loop/skills). In Codex:
+
+    ```text
+    $gsd-loop-spec
+    ```
+
+    Describe who needs the change, what they should be able to do, and what is
+    out of scope. Answer the interview questions and review the proposed issue.
+    For an uncertain effort, start with `gsd-loop-discover` instead.
+  </Step>
+  <Step title="Approve each issue">
+    Read the filed GitHub issue. Check its `O-N` outcomes and `X-N` exclusions.
+    Add `gsd:ready` to each issue you approve. Creating an issue does not approve it.
+  </Step>
+  <Step title="Run one build pass">
+    Open a build session and invoke `gsd-loop-build`. In Codex:
+
+    ```text
+    $gsd-loop-build
+    ```
+
+    The builder repairs eligible rework first. Otherwise, it claims the oldest
+    safe ready issue, implements it in an isolated worktree, and opens a PR.
+  </Step>
+  <Step title="Run one review pass">
+    Check review readiness:
+
+    ```bash
+    npx @opengsd/gsd-loop@latest doctor --review-ready
+    ```
+
+    Open a separate review session and invoke `gsd-loop-review`. In Codex:
+
+    ```text
+    $gsd-loop-review
+    ```
+
+    Read the verdict. Blocking findings return the PR to `gsd:rework`.
+    Complete evidence results in `gsd:approved`. Run another build and review
+    pass when repair is needed.
+  </Step>
+  <Step title="Make the merge decision">
+    Check the final diff, required CI, and review evidence. Merge the PR when
+    you are satisfied. The loop stops short of merging.
+  </Step>
+</Steps>
+
+<Note>
+  If setup reports that review is blocked because no successful CI check exists,
+  add real CI through a spec/build issue, wait for it to pass, then rerun `init`.
+  Review does not treat missing required checks as success.
+</Note>
+
+Use [scheduling](/loop/scheduling) to repeat build and review passes, or
+[troubleshooting](/loop/troubleshooting) when a pass cannot continue.

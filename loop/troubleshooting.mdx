@@ -1,0 +1,73 @@
+---
+title: "Troubleshooting"
+description: "Recover from setup failures, missing skills, blocked work, and interrupted passes."
+---
+
+Start with the readiness check for the lane you want to run:
+
+```bash
+npx @opengsd/gsd-loop@latest doctor
+npx @opengsd/gsd-loop@latest doctor --review-ready
+```
+
+## Setup and upgrades
+
+
+- **Upgrading from `0.4.0`:** rerun `init` or `install` with version `0.4.1` to
+  bundle the outcome helper required by discovery and specification.
+- **Upgrading from `0.3.0`:** rerun `init` or `install` with version `0.4.1` to
+  refresh the installed skills and deterministic helpers.
+- **Upgrading from `0.2.5`:** rerun `init` or `install` with version `0.4.1` to
+  add the interactive discovery workflow and its deterministic map helpers.
+- **Upgrading from `0.2.3` or `0.2.4`:** rerun `init` with version `0.4.1` to
+  install discovery and the corrected Claude skill entry points. Upgrades from
+  `0.2.3` also install the build linkage guard and Grok adapter, and locally
+  exclude `.gsd/scheduled_tasks.lock`. Use `install` instead only when
+  repository setup is not wanted.
+- **Upgrading from `0.2.2`:** rerun `init` or `install` with version `0.4.1` so
+  review outcome synchronization recognizes the repository identity returned
+  by the `gh` CLI for linked issues.
+- **Upgrading from `0.2.1`:** rerun `init` or `install` with version `0.4.1` to
+  add the native Cursor and Gemini adapters. Existing canonical and Claude
+  installs remain installer-owned and update safely.
+- **Upgrading from `0.2.0`:** stop any old `npx ... run build|review`
+  processes. Version `0.4.1` ignores their `.git/gsd-loop` state; remove that
+  directory only after confirming no old runner process is active.
+- **A skill is not visible:** start a new agent session. Gemini can run
+  `/skills reload`; Grok can inspect `/skills`; Cursor users should open a new
+  chat and reload Cursor if the skill remains absent.
+- **Review remains blocked:** allow CI to complete successfully, rerun `init`,
+  and select the check when prompted.
+- **Native scheduling is unavailable:** run the build or review skill manually
+  for another bounded pass. Do not substitute an external agent launcher.
+- **Native adapter symlink creation fails:** rerun with
+  `--adapter-mode copy`.
+- **The installer refuses a path:** preserve and inspect it. gsd-loop never
+  overwrites an unowned destination.
+
+## A queue item is blocked
+
+Read the issue's question, answer it, then remove `gsd:blocked`. Leave
+`gsd:ready` on the issue so the builder can select it again.
+
+For `gsd:escalated`, read the issue or PR explanation and resolve the cause
+before removing the label. Escalation can mean the contract is unclear, a
+required check is missing, or repeated repair has not converged. Removing the
+label alone does not fix the cause.
+
+## A pass was interrupted
+
+Run the same lane skill again. The builder checks Git and GitHub for unfinished
+work, open PRs, and stale claims before selecting new work. Do not start another
+builder for the same repository while the first is active.
+
+The reviewer can repair labels and outcome checkboxes from a verdict that still
+matches the commit, linked issue, and contract. A new commit or contract edit
+requires a fresh review. Do not mark outcomes complete by hand to bypass review.
+
+## Scheduled work stopped
+
+Read the last task result. Three consecutive idle passes pause the task.
+Credentials, permissions, unrelated dirty worktrees, and escalations also pause
+it. Resolve the reported cause, then invoke `gsd-loop-schedule` in the lane's
+session to update the task. See [scheduling](/loop/scheduling).
