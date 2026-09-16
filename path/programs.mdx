@@ -1,0 +1,43 @@
+---
+title: "Multi-milestone programs"
+description: "Use a charter and roadmap to deliver a larger outcome through approved milestones."
+---
+
+A program adds durable scope and decisions above the milestone cycle. Use it
+when the outcome needs a sequence of milestones with separate delivery gates.
+
+## Establish the program
+
+1. Define the program outcome, constraints, and vetoes in `.project/CHARTER.md`.
+2. Research open questions and record program decisions in `.project/SYNTHESIS.md`.
+3. Review and approve the milestone slicing in `.project/ROADMAP.md`.
+4. Derive the first milestone's intent from its approved roadmap entry.
+
+These program files remain active after a milestone ships. Each milestone
+still needs its own intent, plan, build evidence, and ship gate.
+
+## Move between milestones
+
+After integration validates, the router binds a new unused `gsd-path/M00N`
+branch at the current `origin/main`. It then inspects the current code and
+documentation and defines the next milestone. Research and decision phases
+run when its roadmap entry has open questions.
+
+The first milestone after roadmap approval starts at milestone definition;
+brownfield inspection has already run at program start when required.
+
+## Plan ahead during build
+
+Lookahead planning stores the next milestone's work under `.project/next/`.
+It does not change the active build's task contracts or bind another milestone
+branch. At the milestone boundary, the router promotes the track through the
+pipeline helper and checks plan drift.
+
+## Change program direction
+
+An explicit ruling can abandon a building milestone, archive its partial work,
+and return to roadmap slicing. Give that ruling through the router. Do not
+delete tasks or edit archived evidence to reshape the plan.
+
+See [recovery and discussion](/path/recovery) for raising a concern before changing
+an approved contract.

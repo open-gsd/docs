@@ -152,7 +152,42 @@
         ]
       },
       {
-        "tab": "GSD Path"
+        "tab": "GSD Path",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "path/introduction",
+              "path/quickstart",
+              "path/installation"
+            ]
+          },
+          {
+            "group": "Run a project",
+            "pages": [
+              "path/workflow",
+              "path/programs",
+              "path/shipping",
+              "path/recovery"
+            ]
+          },
+          {
+            "group": "Maintain your setup",
+            "pages": [
+              "path/updating",
+              "path/guard-hooks",
+              "path/migration"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "path/reference/skills",
+              "path/reference/hosts",
+              "path/reference/artifacts"
+            ]
+          }
+        ]
       },
       {
         "tab": "GSD Graph"

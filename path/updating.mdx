@@ -1,0 +1,61 @@
+---
+title: "Update an installation"
+description: "Refresh skills and managed runtime files while preserving project contracts and active milestones."
+---
+
+Run these commands from your GSD Path clone. Preview updates before applying
+them, then restart the agent session so it reloads the skills.
+
+## Update global skills
+
+```bash
+git pull
+node scripts/install.mjs --update --dry-run
+node scripts/install.mjs --update
+```
+
+`--update` refreshes hosts that already have GSD Path installed. Add host flags
+to select specific installations. Existing managed skills move to
+`disabled-gsd-skills` beside each skill root before replacement.
+
+## Refresh an existing project
+
+```bash
+node scripts/install.mjs --update --project /absolute/path/to/your-project --dry-run
+node scripts/install.mjs --update --project /absolute/path/to/your-project
+```
+
+This refreshes managed `.gsd-path/` files and retains `AGENTS.md`, `WORKFLOW.md`,
+and `.claude/CLAUDE.md`. Compare upstream contract changes and merge them by
+hand. The installer does not rewrite active `.project/` artifacts.
+
+## Update project-local skills
+
+Run from the target repository using the absolute installer path:
+
+```bash
+cd /absolute/path/to/your-project
+node /absolute/path/to/gsd-path/scripts/install.mjs --update --local --dry-run
+node /absolute/path/to/gsd-path/scripts/install.mjs --update --local
+```
+
+## Refresh hooks and runtime
+
+| Need | Flag with `--project PATH` |
+| --- | --- |
+| Refresh managed runtime and installed guard scripts | `--hooks-refresh` |
+| Also refresh native settings and Git hooks | `--hooks-refresh-full` |
+| Add guards to an existing project while keeping its contracts | `--hooks-init` plus your host flags |
+
+See [guard hooks](/path/guard-hooks) for host activation requirements. A refresh
+refuses unrecognized files rather than overwriting them.
+
+## Check the result
+
+```bash
+node scripts/install.mjs --doctor --project /absolute/path/to/your-project
+```
+
+Restart the host, then ask the router for status. For detailed migration notes
+on older contracts, read
+[UPDATE.md](https://github.com/open-gsd/gsd-path/blob/main/UPDATE.md).

@@ -1,0 +1,45 @@
+---
+title: "Move from GSD Core"
+description: "Preserve Core history and unfinished work while moving a project into GSD Path's gates."
+---
+
+The migration skill supports Claude Code and Codex projects with plugin or
+standalone skill installations. Both products can remain installed. Migration
+changes which workflow governs the selected project.
+
+## Prepare the project
+
+Install or [update GSD Path](/path/updating), stop active Core work, and preserve
+pending edits. Reach a clean Git baseline before Path binds its branch.
+Keep `.planning/`; it remains the project's Core history.
+
+In Codex, invoke:
+
+```text
+$gsd-path-migrate
+```
+
+In Claude Code, invoke `/gsd-path-migrate`. Provide the project path and tell
+the skill whether Core came from a plugin or standalone skills.
+
+## Review the import
+
+The skill prepares an external bundle with a file copy, hash manifest, and
+`IMPORT.md`. It carries constraints, decisions, exclusions, unfinished
+requirements, and source references. Completed Core plans remain historical
+evidence; they do not count as passed Path gates.
+
+Review the proposed host and hook changes. A project-level plugin override may
+be limited by host policy, and disabling a plugin does not remove separate
+hooks or skills. The skill must verify the effective state in your environment.
+
+## Enter Path
+
+After reviewing `IMPORT.md`, hand it to the explicit Path router. Path inspects
+the code and asks you to approve intent. When inspection finishes, pass the
+absolute `IMPORT.md` path to define again using the command in the import's
+Handoff section. This is also required in a fresh session.
+
+Keep the bundle and any rollback receipts available. For host-specific cutover,
+hook settings, and rollback rules, read
+[MIGRATE.md](https://github.com/open-gsd/gsd-path/blob/main/MIGRATE.md).
