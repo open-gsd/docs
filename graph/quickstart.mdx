@@ -1,0 +1,64 @@
+---
+title: "Quickstart"
+description: "Build a graph from an explicit relationship chain and inspect a cited answer."
+---
+
+Complete [installation](/graph/installation) first. This example uses explicit
+relationships so the default extractor can build a multi-hop path without an LLM.
+Run it in a project where you can add a documentation file.
+
+<Steps>
+  <Step title="Add relationships">
+    Create `docs/graph-example.md` with this content:
+
+    ```markdown
+    # Supply chain
+
+    [[Drought]] --causes--> [[Crop Failure]]
+    [[Crop Failure]] --causes--> [[Food Shortage]]
+    ```
+  </Step>
+  <Step title="Build the graph">
+    ```bash
+    gsd-graph enable
+    gsd-graph status
+    ```
+
+    `enable` indexes the discovered documentation corpus. Check the node and
+    triple counts in status. In an already enabled project, use `gsd-graph sync`.
+  </Step>
+  <Step title="Ask and inspect">
+    ```bash
+    gsd-graph ask "why does drought cause food shortage?"
+    gsd-graph why "Drought" "Food Shortage"
+    ```
+
+    Check that the answer cites the relationship chain in `docs/graph-example.md`.
+    To inspect the evidence used for an answer:
+
+    ```bash
+    gsd-graph pack "why does drought cause food shortage?"
+    ```
+  </Step>
+  <Step title="Keep it current">
+    After changing your documents, refresh the graph:
+
+    ```bash
+    gsd-graph sync
+    ```
+
+    You can also export an interactive view:
+
+    ```bash
+    gsd-graph export --format html --open
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  Ordinary prose does not automatically become typed relationships. If an answer
+  abstains, inspect your corpus and extraction mode before assuming it is a failure.
+</Note>
+
+Continue with [daily use](/graph/workflow), [corpus and extraction](/graph/corpus),
+or [MCP setup](/graph/mcp).

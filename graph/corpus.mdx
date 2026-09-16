@@ -1,0 +1,90 @@
+---
+title: "Corpus and extraction"
+description: "Choose source files, write explicit relationships, and review inferred facts."
+---
+
+With no configured corpus, GSD Graph discovers documentation directories such as
+`.planning`, `docs`, `doc`, `wiki`, and `architecture`. It also checks top-level
+files such as `README.md`, `CHANGELOG.md`, `AGENTS.md`, and `CLAUDE.md`.
+
+It does not index the whole repository or all of `src/` by default.
+
+## Choose sources
+
+Add roots to project sync:
+
+```bash
+gsd-graph sync --corpus ./specs --corpus ./adr
+```
+
+Use the explicit build pipeline when you want to supply the corpus directly:
+
+```bash
+gsd-graph build --corpus ./docs
+```
+
+Set `corpus` in `.gsd-graph/config.json` for a persistent corpus choice. Use
+`sync --full` after changes that require all sources to be re-extracted.
+
+## Write explicit relationships
+
+The deterministic extractor reads structured content such as headings, wiki
+links, edge lines, JSONL records, and supported YAML/frontmatter fields.
+
+```markdown
+[[Auth]] --part_of--> [[API]]
+[[RateLimit]] --causes--> [[429s]]
+```
+
+Free prose alone does not produce typed relationship edges. Confidence tiers are
+`EXTRACTED`, `INFERRED`, and `AMBIGUOUS`; retrieval favors stronger evidence.
+
+## Extract from prose
+
+Prompt mode prepares an extraction request for your host agent:
+
+```bash
+gsd-graph sync --llm
+```
+
+The agent reads `.gsd-graph/.prompt-extract.json` and writes the requested result
+to `.gsd-graph/.prompt-extract-result.json`. Apply it with:
+
+```bash
+gsd-graph prompt apply extract
+```
+
+The CLI does not call an endpoint in prompt mode. Your host agent's own model
+and data handling still apply. For direct endpoint calls, use `sync --llm http`
+and configure `llm.http` with `provider`, `model`, and `api_key_env`; `base_url`
+is optional. The supported provider formats are OpenAI and Anthropic.
+
+LLM candidates receive `INFERRED` confidence and LLM provenance. Unknown types or
+predicates go through the same ontology review gate as deterministic extraction.
+
+## Choose an ontology
+
+| Pack | Purpose |
+|---|---|
+| `general` | General relationships; the default |
+| `engineering` | Services, incidents, requirements, and decisions |
+| `research` | Papers, claims, and authors |
+
+```bash
+gsd-graph init --ontology engineering
+gsd-graph ontology show
+gsd-graph ontology validate
+```
+
+Inspect candidates before resolving them:
+
+```bash
+gsd-graph review summary
+gsd-graph review list
+gsd-graph review accept <id>
+gsd-graph review reject <id>
+```
+
+Use `review accept <id> --extend-ontology` when you intend to extend the schema.
+`gsd-graph ontology eject` writes the active pack and accepted extensions into a
+local pack you can commit.

@@ -1,0 +1,66 @@
+---
+title: "Reference and troubleshooting"
+description: "Find store files, output modes, common commands, and recovery steps."
+---
+
+## Store files
+
+| Path under `.gsd-graph/` | Role |
+|---|---|
+| `graph.v1.json` | Canonical graph used by native queries and answers |
+| `config.json` | Project configuration |
+| `sources.manifest.json` | Source fingerprints for incremental sync |
+| `review-queue.json` | Candidates that need review |
+| `ontology.lock.json` | Resolved ontology snapshot |
+| `episodes.jsonl` | Recorded assertions and retractions |
+| `snapshots/` | Saved canonical graphs |
+| `graph.json` | Disposable viewer projection |
+| `GRAPH_REPORT.md` | Human summary |
+| `communities/` | Disposable theme reports |
+
+## Output and store selection
+
+Interactive `ask`, `why`, `status`, `query`, and `top` commands can render human
+output. Use `--json` for machine output; piped output and CI also use JSON.
+
+```bash
+gsd-graph --json status
+gsd-graph --dir ./my-store status
+```
+
+`GSD_GRAPH_DIR` also selects the store. The default is `.gsd-graph`.
+
+## Additional commands
+
+| Command | Purpose |
+|---|---|
+| `gsd-graph sync --full --report` | Re-extract and write a report |
+| `gsd-graph communities detect` | Detect corpus themes |
+| `gsd-graph export --format mermaid` | Export a diagram |
+| `gsd-graph export --format graphml` | Export GraphML |
+| `gsd-graph export --format cypher` | Export Cypher |
+| `gsd-graph embeddings build` | Build an opt-in embedding sidecar |
+| `gsd-graph embeddings status` | Inspect the embedding sidecar |
+| `gsd-graph ask "question" --semantic` | Use semantic seed fallback when needed |
+| `gsd-graph eval` | Run answer-quality cases |
+
+Embeddings use an OpenAI-compatible provider and require separate configuration.
+They are optional; ordinary extraction and retrieval remain deterministic.
+
+## Troubleshooting
+
+| Symptom | Next step |
+|---|---|
+| No graph found | Run `gsd-graph enable` in the project |
+| `corpus_not_found` | Add a documentation source or pass `--corpus` |
+| Answer abstains | Inspect `query` and `pack`; add explicit relationships or use LLM extraction |
+| Graph is stale | Run `sync` and inspect `.last-sync-status.json` |
+| Hook does not run | Check hook registration, branch, configuration, CLI availability, and CI environment |
+| `build_locked` | Wait for the active writer; verify its PID before treating a lock as stale |
+| Review queue grows | Inspect `review summary` and choose an ontology that fits your corpus |
+| MCP tools do not appear | Restart the host and run `mcp doctor` |
+| MCP writes are unavailable | Enable the specific [write permission](/graph/mcp#enable-write-tools) |
+
+An abstention can mean no seeds matched, matched seeds were disconnected, or the
+retrieved subgraph was empty. Inspect any returned suggestions and the source
+relationships before widening retrieval.

@@ -1,0 +1,71 @@
+---
+title: "MCP setup"
+description: "Connect GSD Graph to your agent and enable graph writes only when needed."
+---
+
+Register the MCP server from your project directory:
+
+```bash
+gsd-graph mcp install
+```
+
+The installer supports Claude Code, Codex, Cursor, and a project `.mcp.json`.
+Restart your host after registration, then check the installation:
+
+```bash
+gsd-graph mcp doctor
+```
+
+Select hosts explicitly when needed:
+
+```bash
+gsd-graph mcp install --host claude --host project
+```
+
+## Default tools
+
+| Tool | Purpose |
+|---|---|
+| `graph_status` | Counts and graph health |
+| `graph_query` | Query, neighborhood, path, and filter operations |
+| `graph_pack` | Evidence subgraph with citations |
+| `graph_answer` | Grounded answers and global themes |
+| `graph_why` | Cited explanations of paths |
+| `graph_resolve` | Resolve terms to node IDs |
+| `graph_diff` | Compare against a graph baseline |
+| `graph_communities` | Detect themes; read-only unless writing is enabled |
+| `graph_review_list` | Inspect pending review items |
+
+The resources `gsd-graph://report` and `gsd-graph://communities` expose the human
+report and community themes for agent briefings.
+
+## Enable write tools
+
+| Permission | Tools |
+|---|---|
+| `--allow-build` or `mcp.allow_build` | `graph_build`, `graph_sync` |
+| `--allow-review-write` or `mcp.allow_review_write` | `graph_review_resolve` |
+| `--allow-assert` or `mcp.allow_assert` | `graph_assert`, `graph_retract` |
+
+For example, register with build permission:
+
+```bash
+gsd-graph mcp install --allow-build
+```
+
+Restart the host after changing registration. Write permissions are off by
+default; choose them for the work you want your agent to perform.
+
+## Manual launch
+
+A global package installation provides the stdio server:
+
+```bash
+gsd-graph-mcp
+```
+
+Use an absolute store path when the MCP host does not start in your project:
+
+```bash
+gsd-graph-mcp --dir /absolute/path/to/project/.gsd-graph
+```

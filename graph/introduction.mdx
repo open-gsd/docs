@@ -1,0 +1,44 @@
+---
+title: "GSD Graph"
+description: "Build a local relationship graph from project documents and answer questions with source citations."
+---
+
+GSD Graph stores relationships from your documentation and planning files as
+subject–predicate–object triples with source provenance. You can follow dependency
+chains, inspect decisions, and answer questions from a focused subgraph.
+
+The default extraction and answer paths run locally without an API key. Optional
+LLM stages add prose extraction and grounded answers. GSD Graph runs independently
+of GSD Core, GSD Path, and Python graphify.
+
+<Columns cols={2}>
+  <Card title="Build your first graph" icon="play" href="/graph/quickstart">
+    Install the CLI and ask a question about an explicit relationship chain.
+  </Card>
+  <Card title="Use the graph each day" icon="arrows-rotate" href="/graph/workflow">
+    Keep your graph current and choose between ask, query, pack, and why.
+  </Card>
+  <Card title="Connect your agent" icon="plug" href="/graph/mcp">
+    Register the MCP server and choose which write tools to enable.
+  </Card>
+  <Card title="Prepare your corpus" icon="file-lines" href="/graph/corpus">
+    Learn what gets indexed and how prose becomes relationships.
+  </Card>
+</Columns>
+
+## How it works
+
+```text
+extract → normalize → store → query → ground → maintain
+```
+
+The canonical store is `.gsd-graph/graph.v1.json`. Queries retrieve relevant nodes,
+triples, paths, and citations. Answers use this evidence and can abstain when
+there is no supporting subgraph.
+
+Use GSD Graph for relationships in project knowledge. For source-code callers,
+imports, and change impact, use a code graph tool. GSD Graph does not scan all of
+`src/` by default.
+
+See the [source repository](https://github.com/open-gsd/gsd-graph) and
+[release history](https://github.com/open-gsd/gsd-graph/blob/main/CHANGELOG.md).

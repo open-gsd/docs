@@ -1,0 +1,58 @@
+---
+title: "Installation"
+description: "Install the CLI, enable a project, and update your GSD Graph setup."
+---
+
+You need Node.js 22 or newer and npm 10 or newer, as required by the package.
+Run project commands from the repository you want to index.
+
+## Install the CLI
+
+```bash
+npm install -g @opengsd/gsd-graph
+```
+
+Enable the current project and register supported MCP hosts:
+
+```bash
+gsd-graph enable --mcp
+```
+
+`enable` installs the agent skill and project hooks, writes
+`.gsd-graph/config.json`, and runs a full sync of the discovered corpus. It mirrors
+settings into `.planning/config.json` only when that file already exists.
+
+Use `gsd-graph enable --skip-sync` to install the integration without building the
+graph. See [MCP setup](/graph/mcp) for host registration and restart steps.
+
+## Run without a global install
+
+Use the scoped package name so npx resolves the binary:
+
+```bash
+npx -y @opengsd/gsd-graph enable
+npx -y @opengsd/gsd-graph status
+```
+
+For reproducible automation, pin a release rather than resolving the latest
+package on each run.
+
+## Use the library
+
+Install a project dependency when application code imports the Node.js API:
+
+```bash
+npm install @opengsd/gsd-graph
+```
+
+The package includes TypeScript declarations. A local installation also makes
+`npx gsd-graph` available in that project.
+
+## Update
+
+```bash
+npm install -g @opengsd/gsd-graph@latest
+gsd-graph --version
+```
+
+Continue with the [quickstart](/graph/quickstart).
