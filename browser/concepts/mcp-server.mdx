@@ -69,7 +69,7 @@ The MCP server exposes 50+ tools grouped into logical categories. Call `tools/li
   </Accordion>
 
   <Accordion title="Interaction">
-    `browser_click_ref`, `browser_fill_ref`, `browser_hover_ref`, `browser_click`, `browser_type`, `browser_press`, `browser_scroll`, `browser_drag`, `browser_select_option`, `browser_set_checked`, `browser_upload_file`, `browser_set_viewport` — precise element interaction using refs or CSS selectors.
+    `browser_click_ref`, `browser_fill_ref`, `browser_hover_ref`, `browser_click`, `browser_type`, `browser_press`, `browser_scroll`, `browser_drag`, `browser_select_option`, `browser_set_checked`, `browser_upload_file`, `browser_set_viewport` — precise element interaction using refs or CSS selectors. `browser_click_ref` accepts an optional `double_click: true` to dispatch a DOM `dblclick` instead of a single click, which some inline-edit and grid components require.
   </Accordion>
 
   <Accordion title="Semantic & intent-based tools">
@@ -105,7 +105,7 @@ The MCP server exposes 50+ tools grouped into logical categories. Call `tools/li
   </Accordion>
 
   <Accordion title="Diagnostics & debugging">
-    `browser_console`, `browser_network`, `browser_timeline`, `browser_debug_bundle`, `browser_session_summary`, `browser_check_injection` — inspect console logs, network traffic, the action timeline, and get a full debug bundle (screenshot + console + network + a11y) when an agent gets stuck.
+    `browser_console`, `browser_network`, `browser_timeline`, `browser_debug_bundle`, `browser_session_summary`, `browser_check_injection`, `browser_evaluate` (alias: `browser_eval`) — inspect console logs, network traffic, the action timeline, and get a full debug bundle (screenshot + console + network + a11y) when an agent gets stuck. `browser_evaluate` runs arbitrary JavaScript in the active page and safely returns the result; `browser_eval` is an identical short alias for agents that prefer the shorter name.
   </Accordion>
 
   <Accordion title="Multi-tab & frame management">
@@ -113,7 +113,7 @@ The MCP server exposes 50+ tools grouped into logical categories. Call `tools/li
   </Accordion>
 
   <Accordion title="Batch execution">
-    `browser_batch` — run a sequence of actions atomically in a single round-trip. Highly recommended for complex multi-step flows where partial state errors must be avoided. Supported step actions include `navigate`, `reload`, `click`, `type`, `select_option`, `key_press`, `press`, `wait_for`, `assert`, `click_ref`, `fill_ref`, `hover`, `hover_ref`, `scroll`, `snapshot`, and `diff`.
+    `browser_batch` — run a sequence of actions atomically in a single round-trip. Highly recommended for complex multi-step flows where partial state errors must be avoided. Supported step actions include `navigate`, `reload`, `click`, `type`, `select_option`, `key_press`, `press`, `wait_for`, `assert`, `click_ref` (supports `double_click: true`), `fill_ref`, `hover`, `hover_ref`, `scroll`, `snapshot`, `diff`, and `eval`.
   </Accordion>
 
   <Accordion title="Action cache">
@@ -333,6 +333,8 @@ Follow the `suggested_next_actions` on every call — they contain high-signal h
 ## How the MCP adapter works
 
 The MCP server is a thin, high-fidelity adapter over the same daemon client that the CLI uses. When your agent calls a tool, the server translates the JSON-RPC request directly to the daemon's internal API, attaches the standardized response envelope, and returns the result. You get automatic daemon lifecycle management, named session routing, and all the reliability guarantees of the CLI — plus the discoverability and structured envelopes that MCP provides.
+
+Daemons started on behalf of an MCP client follow the same idle-shutdown and version-mismatch auto-restart rules as the CLI. Tune `GSD_BROWSER_IDLE_SHUTDOWN_SECONDS` in your MCP client's `env` block to control how long an inactive agent session holds a Chrome process open. See [Daemon lifecycle and idle shutdown](/browser/concepts/sessions#daemon-lifecycle-and-idle-shutdown).
 
 ```
 MCP Client (Cursor / Claude / VS Code)

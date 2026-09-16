@@ -43,6 +43,35 @@ gsd-browser --session checkout daemon health
 gsd-browser --session checkout daemon stop
 ```
 
+## Daemon lifecycle and idle shutdown
+
+Each session's daemon is long-lived but not permanent. To keep idle sessions from holding Chrome processes open forever, the daemon automatically exits when it has been idle for a configurable window, and the next CLI or MCP request transparently starts a fresh one.
+
+### Idle shutdown
+
+The daemon tracks the time since the last IPC request it handled. After the configured idle window passes with no in-flight requests, it shuts down gracefully through the same path as `daemon stop` — cleaning up the browser, marking the session manifest as stopped, and releasing the IPC endpoint. The next command on that session auto-starts a new daemon, so the behavior is invisible to scripts and agents.
+
+Configure the window with `GSD_BROWSER_IDLE_SHUTDOWN_SECONDS`:
+
+```bash
+# Default: shut down after 1 hour (3600 seconds) of inactivity
+gsd-browser --session checkout navigate https://myapp.com
+
+# Aggressive: shut down after 5 minutes (useful for short-lived CI jobs)
+export GSD_BROWSER_IDLE_SHUTDOWN_SECONDS=300
+gsd-browser --session checkout navigate https://myapp.com
+
+# Disable idle shutdown entirely (long-running interactive sessions)
+export GSD_BROWSER_IDLE_SHUTDOWN_SECONDS=0
+gsd-browser --session checkout daemon start
+```
+
+Set the variable when launching the daemon — either before the first command that starts it, or in the `env` block of your MCP client configuration. The daemon reads it once at startup.
+
+### Auto-restart on version mismatch
+
+When you upgrade gsd-browser, the running daemon for a session may still be the previous version. On the next request, the CLI compares its own version against the version recorded in the session manifest. If they differ, the CLI stops the live daemon and starts a new one built from the current binary before forwarding the request. No manual `daemon restart` is required after an upgrade.
+
 ## Saving and restoring browser state
 
 Persist the full browser state — cookies, local storage, session storage — to disk so it can be restored later. This is the recommended way to preserve authenticated states across daemon restarts.
